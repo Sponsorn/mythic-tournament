@@ -1,0 +1,17 @@
+{
+  "name": "lucky-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for reaction-based competitions with slash commands",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy-commands": "node src/deploy-commands.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.2.3"
+  }
+}

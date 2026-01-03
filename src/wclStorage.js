@@ -1,0 +1,237 @@
+const fs = require('fs');
+const path = require('path');
+
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const WCL_JSON = path.join(DATA_DIR, 'wcl.json');
+const WCL_SCORES = path.join(DATA_DIR, 'wcl_scores.csv');
+
+const DEFAULT_DATA = {
+  teams: [],
+  seenWcl: [],
+  leaderboardWcl: {},
+  wclMeta: {},
+};
+
+const SCORE_HEADER = [
+  'finished_at_realm',
+  'team',
+  'dungeon',
+  'level',
+  'upgrades',
+  'blizz_rating',
+  'in_time',
+  'points',
+  'deaths',
+  'character',
+  'realm',
+  'region',
+];
+
+let cache = null;
+
+function ensureTeamDefaults(team) {
+  return {
+    team_name: team?.team_name || '',
+    leader_name: team?.leader_name || '',
+    wcl_url: team?.wcl_url || '',
+    wcl_backup_url: team?.wcl_backup_url || '',
+  };
+}
+
+function ensureFiles() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(WCL_JSON)) {
+    fs.writeFileSync(WCL_JSON, JSON.stringify(DEFAULT_DATA, null, 2), 'utf8');
+  }
+  if (!fs.existsSync(WCL_SCORES)) {
+    fs.writeFileSync(WCL_SCORES, `${SCORE_HEADER.join(',')}\n`, 'utf8');
+  }
+}
+
+function loadData() {
+  ensureFiles();
+  if (cache) return cache;
+  try {
+    const raw = fs.readFileSync(WCL_JSON, 'utf8');
+    cache = JSON.parse(raw);
+  } catch (err) {
+    cache = { ...DEFAULT_DATA };
+  }
+  cache.teams = Array.isArray(cache.teams)
+    ? cache.teams.map(team => ensureTeamDefaults(team))
+    : [];
+  cache.seenWcl = Array.isArray(cache.seenWcl) ? cache.seenWcl : [];
+  cache.leaderboardWcl = cache.leaderboardWcl || {};
+  cache.wclMeta = cache.wclMeta || {};
+  return cache;
+}
+
+function saveData() {
+  if (!cache) return;
+  fs.writeFileSync(WCL_JSON, JSON.stringify(cache, null, 2), 'utf8');
+}
+
+function reloadData() {
+  cache = null;
+  return loadData();
+}
+
+function getTeams() {
+  return loadData().teams;
+}
+
+function findTeam(teamName) {
+  const data = loadData();
+  const key = String(teamName || '').toLowerCase();
+  return data.teams.find(t => String(t.team_name || '').toLowerCase() === key) || null;
+}
+
+function upsertTeam({ teamName, leaderName, wclUrl, wclBackupUrl }) {
+  const data = loadData();
+  const key = String(teamName || '').toLowerCase();
+  const existing = data.teams.find(t => String(t.team_name || '').toLowerCase() === key);
+  if (existing) {
+    existing.team_name = teamName;
+    existing.leader_name = leaderName || existing.leader_name || '';
+    existing.wcl_url = wclUrl || '';
+    existing.wcl_backup_url = wclBackupUrl || '';
+    saveData();
+    return { status: 'updated', team: existing };
+  }
+  const team = ensureTeamDefaults({
+    team_name: teamName,
+    leader_name: leaderName || '',
+    wcl_url: wclUrl || '',
+    wcl_backup_url: wclBackupUrl || '',
+  });
+  data.teams.push(team);
+  saveData();
+  return { status: 'created', team };
+}
+
+function saveTeams(teams) {
+  const data = loadData();
+  data.teams = Array.isArray(teams) ? teams.map(team => ensureTeamDefaults(team)) : [];
+  saveData();
+}
+
+
+function listTeams() {
+  return getTeams();
+}
+
+function getSeenWcl() {
+  return new Set(loadData().seenWcl || []);
+}
+
+function saveSeenWcl(seenSet) {
+  const data = loadData();
+  data.seenWcl = Array.from(seenSet);
+  saveData();
+}
+
+function updateLeaderboardWcl(team, points) {
+  const data = loadData();
+  const key = String(team || '');
+  data.leaderboardWcl[key] = Number(data.leaderboardWcl[key] || 0) + Number(points || 0);
+  saveData();
+}
+
+function readLeaderboardWcl() {
+  const data = loadData();
+  return data.leaderboardWcl || {};
+}
+
+function readWclMeta() {
+  const data = loadData();
+  return data.wclMeta || {};
+}
+
+function updateWclMeta(team, tsIso) {
+  const data = loadData();
+  const key = String(team || '');
+  const cur = data.wclMeta[key] || { runs: 0, last: null };
+  cur.runs = Number(cur.runs || 0) + 1;
+  try {
+    if (tsIso) {
+      const next = new Date(tsIso);
+      const prev = cur.last ? new Date(cur.last) : null;
+      if (!prev || next > prev) {
+        cur.last = tsIso;
+      }
+    }
+  } catch (err) {
+    cur.last = tsIso || cur.last;
+  }
+  data.wclMeta[key] = cur;
+  saveData();
+}
+
+function csvEscape(value) {
+  const str = String(value ?? '');
+  if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function writeScoreRow(row) {
+  ensureFiles();
+  const line = SCORE_HEADER.map(key => csvEscape(row[key])).join(',');
+  fs.appendFileSync(WCL_SCORES, `${line}\n`, 'utf8');
+}
+
+function parseCsvLine(line) {
+  const out = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"' && inQuotes && line[i + 1] === '"') {
+      cur += '"';
+      i += 1;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (ch === ',' && !inQuotes) {
+      out.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+function readScores() {
+  if (!fs.existsSync(WCL_SCORES)) return [];
+  const raw = fs.readFileSync(WCL_SCORES, 'utf8');
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  if (lines.length <= 1) return [];
+  return lines.slice(1).map(parseCsvLine);
+}
+
+module.exports = {
+  ensureFiles,
+  reloadData,
+  getTeams,
+  findTeam,
+  upsertTeam,
+  saveTeams,
+  listTeams,
+  getSeenWcl,
+  saveSeenWcl,
+  updateLeaderboardWcl,
+  readLeaderboardWcl,
+  readWclMeta,
+  updateWclMeta,
+  writeScoreRow,
+  readScores,
+  SCORE_HEADER,
+};

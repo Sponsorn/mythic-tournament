@@ -39,6 +39,11 @@ const commands = [
     )
     .addSubcommand(sub =>
       sub
+        .setName('setup')
+        .setDescription('Interactive setup for a competition')
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('end')
         .setDescription('End the current competition (keeps data for viewing)')
     )
@@ -70,6 +75,55 @@ const commands = [
       sub
         .setName('check')
         .setDescription('Manually check Epic free games right now')
+    ),
+  new SlashCommandBuilder()
+    .setName('wcl')
+    .setDescription('Warcraft Logs tracking')
+    .addSubcommand(sub =>
+      sub
+        .setName('scoreboard')
+        .setDescription('Show standings (WCL only)')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('teamruns')
+        .setDescription('Show recent runs for a team')
+        .addStringOption(opt =>
+          opt
+            .setName('team_name')
+            .setDescription('Team name (optional)')
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('limit')
+            .setDescription('Number of rows (default 10)')
+            .addChoices(
+              { name: '5', value: 5 },
+              { name: '10', value: 10 },
+              { name: '25', value: 25 },
+              { name: '50', value: 50 }
+            )
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('forcecheck')
+        .setDescription('Poll WCL now and announce new runs')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('team')
+        .setDescription('Create or update a team')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('listteams')
+        .setDescription('List current teams and WCL link availability')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('reloadteams')
+        .setDescription('Reload teams data from disk')
     ),
 ].map(cmd => cmd.toJSON());
 

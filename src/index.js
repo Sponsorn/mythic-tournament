@@ -6,8 +6,25 @@ const {
   Partials,
   Events,
   ChannelType,
+  ActionRowBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } = require('discord.js');
 const JsonStore = require('./store');
+const { collectRunsAndSync } = require('./wclCollector');
+const {
+  ensureFiles: ensureWclFiles,
+  reloadData: reloadWclData,
+  listTeams,
+  upsertTeam,
+  getSeenWcl,
+  readLeaderboardWcl,
+  readWclMeta,
+  readScores,
+  SCORE_HEADER,
+} = require('./wclStorage');
+const { normalizeRealmSlug, formatLocalTime, formatTable } = require('./wclUtils');
 
 const store = new JsonStore(path.join(__dirname, '..', 'data', 'store.json'));
 const COMP_TZ = 'Europe/Stockholm';
@@ -15,6 +32,12 @@ const EPHEMERAL_FLAG = 1 << 6;
 const EPIC_LOCALE = process.env.EPIC_LOCALE || 'en-US';
 const EPIC_COUNTRY = process.env.EPIC_COUNTRY || 'US';
 const EPIC_CHECK_INTERVAL_MS = Number(process.env.EPIC_CHECK_INTERVAL_MS || 21600000);
+const ANNOUNCE_CHANNEL_ID = process.env.ANNOUNCE_CHANNEL_ID || null;
+const COMMANDS_CHANNEL_ID = process.env.COMMANDS_CHANNEL_ID || null;
+const WCL_POLL_INTERVAL_MINUTES = Number(process.env.WCL_POLL_INTERVAL_MINUTES || 5);
+const REALM_TZ = process.env.REALM_TZ || 'Europe/Stockholm';
+const WCL_CLIENT_ID = process.env.WCL_CLIENT_ID || '';
+const WCL_CLIENT_SECRET = process.env.WCL_CLIENT_SECRET || '';
 const EPIC_FREE_GAMES_URL =
   'https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions';
 
@@ -27,8 +50,12 @@ const client = new Client({
   partials: [Partials.Message, Partials.Reaction, Partials.User],
 });
 
+const WCL_TEAM_MODAL = 'wcl-team-setup';
+let wclCredsWarned = false;
+
 client.once(Events.ClientReady, readyClient => {
   console.log(`Logged in as ${readyClient.user.tag}`);
+  ensureWclFiles();
   if (EPIC_CHECK_INTERVAL_MS > 0) {
     setInterval(() => {
       checkEpicFreeGames(readyClient).catch(err =>
@@ -37,6 +64,17 @@ client.once(Events.ClientReady, readyClient => {
     }, EPIC_CHECK_INTERVAL_MS);
     checkEpicFreeGames(readyClient).catch(err =>
       console.warn('Epic free games initial check failed', err)
+    );
+  }
+  if (WCL_POLL_INTERVAL_MINUTES > 0) {
+    const intervalMs = WCL_POLL_INTERVAL_MINUTES * 60 * 1000;
+    setInterval(() => {
+      pollWclRuns(readyClient).catch(err =>
+        console.warn('WCL poll failed', err)
+      );
+    }, intervalMs);
+    pollWclRuns(readyClient).catch(err =>
+      console.warn('WCL initial poll failed', err)
     );
   }
 });
@@ -98,6 +136,55 @@ function parseDateInput(input, defaultHour, defaultMinute) {
   // Treat as date-only in Stockholm with provided default time
   const withDefaults = toStockholmIso(input, defaultHour, defaultMinute);
   return withDefaults;
+}
+
+function isCommandsChannel(interaction) {
+  if (!COMMANDS_CHANNEL_ID) return true;
+  if (interaction.channelId === COMMANDS_CHANNEL_ID) return true;
+  return interaction.channel?.parentId === COMMANDS_CHANNEL_ID;
+}
+
+function parseChannelId(input) {
+  const value = String(input || '').trim();
+  if (!value) return null;
+  const match = value.match(/^<#(\d+)>$/) || value.match(/^(\d+)$/);
+  return match ? match[1] : null;
+}
+
+function hasWclCreds() {
+  return Boolean(WCL_CLIENT_ID && WCL_CLIENT_SECRET);
+}
+
+async function resolveTextChannel(clientRef, channelId) {
+  if (!channelId) return null;
+  const channel = await clientRef.channels.fetch(channelId).catch(() => null);
+  if (!channel || channel.type !== ChannelType.GuildText) return null;
+  return channel;
+}
+
+async function pollWclRuns(clientRef) {
+  if (!hasWclCreds()) {
+    if (!wclCredsWarned) {
+      console.warn('WCL polling skipped: missing WCL_CLIENT_ID/WCL_CLIENT_SECRET');
+      wclCredsWarned = true;
+    }
+    return;
+  }
+  const { publicMsgs, privateMsgs, newCount } = await collectRunsAndSync();
+  if (!publicMsgs.length && !privateMsgs.length) return;
+  const announceChannel = await resolveTextChannel(clientRef, ANNOUNCE_CHANNEL_ID);
+  const commandsChannel = await resolveTextChannel(clientRef, COMMANDS_CHANNEL_ID);
+
+  if (newCount && announceChannel) {
+    for (const msg of publicMsgs) {
+      await announceChannel.send(msg);
+    }
+  }
+  if (privateMsgs.length && commandsChannel) {
+    for (const msg of privateMsgs) {
+      await commandsChannel.send(msg);
+    }
+  }
 }
 
 function buildEpicUrl() {
@@ -271,6 +358,109 @@ client.on(Events.MessageReactionRemove, async (reaction, user) => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId === 'competition-setup') {
+      const name = interaction.fields.getTextInputValue('comp-name')?.trim();
+      const channelInput = interaction.fields.getTextInputValue('comp-channel')?.trim();
+      const startDateStr = interaction.fields.getTextInputValue('comp-start')?.trim();
+      const endDateStr = interaction.fields.getTextInputValue('comp-end')?.trim();
+
+      if (!name) {
+        await interaction.reply({
+          content: 'Competition name is required.',
+          flags: EPHEMERAL_FLAG,
+        });
+        return;
+      }
+
+      let channelId = null;
+      if (channelInput) {
+        channelId = parseChannelId(channelInput);
+        if (!channelId) {
+          await interaction.reply({
+            content: 'Invalid channel format. Use a #channel mention or channel ID.',
+            flags: EPHEMERAL_FLAG,
+          });
+          return;
+        }
+        const channel = await interaction.guild?.channels.fetch(channelId).catch(() => null);
+        if (!channel || channel.type !== ChannelType.GuildText) {
+          await interaction.reply({
+            content: 'Channel must be a text channel.',
+            flags: EPHEMERAL_FLAG,
+          });
+          return;
+        }
+      }
+
+      const startDate = startDateStr ? parseDateInput(startDateStr, 0, 1) : null;
+      const endDate = endDateStr ? parseDateInput(endDateStr, 23, 59) : null;
+
+      if (startDateStr && !startDate) {
+        await interaction.reply({
+          content: 'Invalid start_date. Use ISO with timezone or date-only (defaults to 00:01 Stockholm).',
+          flags: EPHEMERAL_FLAG,
+        });
+        return;
+      }
+
+      if (endDateStr && !endDate) {
+        await interaction.reply({
+          content: 'Invalid end_date. Use ISO with timezone or date-only (defaults to 23:59 Stockholm).',
+          flags: EPHEMERAL_FLAG,
+        });
+        return;
+      }
+
+      if (startDate && endDate && Date.parse(startDate) > Date.parse(endDate)) {
+        await interaction.reply({
+          content: 'start_date must be before end_date.',
+          flags: EPHEMERAL_FLAG,
+        });
+        return;
+      }
+
+      store.startCompetition(interaction.guildId, { name, channelId, startDate, endDate });
+      const target = channelId ? `<#${channelId}>` : 'all channels';
+      const schedule =
+        startDate || endDate
+          ? ` (window: ${startDate || 'now'} to ${endDate || 'no end'})`
+          : '';
+      await interaction.reply(
+        `Competition **${name}** started. Tracking reactions in ${target}${schedule}.`
+      );
+      return;
+    }
+
+    if (interaction.customId === WCL_TEAM_MODAL) {
+      const teamName = interaction.fields.getTextInputValue('wcl-team-name')?.trim();
+      const leaderName = interaction.fields.getTextInputValue('wcl-team-leader')?.trim();
+      const wclMain = interaction.fields.getTextInputValue('wcl-team-main')?.trim();
+      const wclBackup = interaction.fields.getTextInputValue('wcl-team-backup')?.trim();
+
+      if (!teamName || !leaderName || !wclMain) {
+        await interaction.reply({
+          content: 'Team name, leader name, and WCL main link are required.',
+          flags: EPHEMERAL_FLAG,
+        });
+        return;
+      }
+
+      const result = upsertTeam({
+        teamName,
+        leaderName,
+        wclUrl: wclMain,
+        wclBackupUrl: wclBackup,
+      });
+      const msg =
+        result.status === 'created'
+          ? `Created team ${teamName}.`
+          : `Updated team ${teamName}.`;
+      await interaction.reply({ content: msg, flags: EPHEMERAL_FLAG });
+      return;
+    }
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'top') {
@@ -344,6 +534,40 @@ client.on(Events.InteractionCreate, async interaction => {
       await interaction.reply(
         `Competition **${name}** started. Tracking reactions in ${target}${schedule}.`
       );
+      return;
+    }
+
+    if (sub === 'setup') {
+      const modal = new ModalBuilder()
+        .setCustomId('competition-setup')
+        .setTitle('Competition setup');
+      const nameInput = new TextInputBuilder()
+        .setCustomId('comp-name')
+        .setLabel('Competition name')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+      const channelInput = new TextInputBuilder()
+        .setCustomId('comp-channel')
+        .setLabel('Channel (optional, #channel or ID)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false);
+      const startInput = new TextInputBuilder()
+        .setCustomId('comp-start')
+        .setLabel('Start date/time (optional, ISO or YYYY-MM-DD)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false);
+      const endInput = new TextInputBuilder()
+        .setCustomId('comp-end')
+        .setLabel('End date/time (optional, ISO or YYYY-MM-DD)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false);
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(nameInput),
+        new ActionRowBuilder().addComponents(channelInput),
+        new ActionRowBuilder().addComponents(startInput),
+        new ActionRowBuilder().addComponents(endInput)
+      );
+      await interaction.showModal(modal);
       return;
     }
 
@@ -436,6 +660,219 @@ client.on(Events.InteractionCreate, async interaction => {
           throw editErr;
         }
       }
+    }
+  }
+
+  if (interaction.commandName === 'wcl') {
+    if (!isCommandsChannel(interaction)) {
+      await interaction.reply({
+        content: 'Commands are not allowed in here, sorry.',
+        flags: EPHEMERAL_FLAG,
+      });
+      return;
+    }
+
+    const sub = interaction.options.getSubcommand();
+
+    if (sub === 'scoreboard') {
+      const leaderboard = readLeaderboardWcl();
+      const seen = getSeenWcl();
+      const meta = readWclMeta();
+      const teams = listTeams();
+      const teamIndex = new Map(
+        teams.map((team, idx) => [String(team.team_name || ''), idx + 1])
+      );
+
+      const runsByTeam = {};
+      for (const key of seen) {
+        const splitIdx = key.indexOf(':id:');
+        if (!key.startsWith('team:') || splitIdx === -1) continue;
+        const teamName = key.slice(5, splitIdx);
+        runsByTeam[teamName] = (runsByTeam[teamName] || 0) + 1;
+      }
+
+      const teamSet = new Set([
+        ...Object.keys(leaderboard || {}),
+        ...Object.keys(meta || {}),
+        ...teams.map(team => team.team_name).filter(Boolean),
+      ]);
+      if (!teamSet.size) {
+        await interaction.reply({ content: 'No teams configured.', flags: EPHEMERAL_FLAG });
+        return;
+      }
+
+      const rows = [];
+      for (const teamName of teamSet) {
+        const points = Number(leaderboard[teamName] || 0);
+        const runs = Number(runsByTeam[teamName] || 0);
+        const lastIso = meta?.[teamName]?.last || '';
+        const lastLocal = formatLocalTime(lastIso, REALM_TZ);
+        const idx = teamIndex.get(teamName);
+        const label = idx ? `${teamName} (Team ${idx})` : teamName;
+        rows.push([label, points, runs, lastLocal]);
+      }
+
+      rows.sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1];
+        if (b[2] !== a[2]) return b[2] - a[2];
+        return String(a[0]).localeCompare(String(b[0]));
+      });
+
+      const ranked = rows.map((row, idx) => [idx + 1, ...row]);
+      const table = formatTable(
+        ['Rank', 'Team name', 'Points', 'Runs', 'Last seen run (WCL)'],
+        ranked
+      );
+      await interaction.reply(`\`\`\`\n${table}\n\`\`\``);
+      return;
+    }
+
+    if (sub === 'teamruns') {
+      const teamName = interaction.options.getString('team_name');
+      const limit = interaction.options.getInteger('limit') ?? 10;
+      const rows = readScores();
+      if (!rows.length) {
+        await interaction.reply('No runs yet.');
+        return;
+      }
+
+      const idx = Object.fromEntries(SCORE_HEADER.map((key, i) => [key, i]));
+      const output = [];
+      for (let i = rows.length - 1; i >= 0; i -= 1) {
+        const row = rows[i];
+        const rowTeam = row[idx.team];
+        if (teamName && rowTeam?.toLowerCase() !== teamName.toLowerCase()) {
+          continue;
+        }
+        const status = Number(row[idx.in_time]) ? `+${row[idx.upgrades]}` : 'depleted';
+        output.push([
+          row[idx.finished_at_realm],
+          row[idx.team],
+          `${row[idx.dungeon]} +${row[idx.level]}`,
+          status,
+          row[idx.points],
+          `${row[idx.character]}-${row[idx.realm]}`,
+        ]);
+        if (output.length >= Math.min(50, Math.max(1, limit))) {
+          break;
+        }
+      }
+
+      if (!output.length) {
+        await interaction.reply('No runs found.');
+        return;
+      }
+
+      const table = formatTable(
+        ['When', 'Team', 'Key', 'Status', 'Points', 'Character'],
+        output
+      );
+      await interaction.reply(`\`\`\`\n${table}\n\`\`\``);
+      return;
+    }
+
+    if (sub === 'forcecheck') {
+      if (!hasWclCreds()) {
+        await interaction.reply({
+          content: 'WCL credentials are not configured.',
+          flags: EPHEMERAL_FLAG,
+        });
+        return;
+      }
+      try {
+        await interaction.deferReply({ flags: EPHEMERAL_FLAG });
+      } catch (err) {
+        if (err?.code === 10062) {
+          console.warn('WCL forcecheck interaction expired before defer', err);
+          return;
+        }
+        throw err;
+      }
+      try {
+        const { publicMsgs, privateMsgs, newCount } = await collectRunsAndSync();
+        const announceChannel = await resolveTextChannel(client, ANNOUNCE_CHANNEL_ID);
+        const commandsChannel = await resolveTextChannel(client, COMMANDS_CHANNEL_ID);
+
+        if (newCount && announceChannel) {
+          for (const msg of publicMsgs) {
+            await announceChannel.send(msg);
+          }
+        }
+        if (privateMsgs.length && commandsChannel) {
+          for (const msg of privateMsgs) {
+            await commandsChannel.send(msg);
+          }
+        }
+        await interaction.editReply(`Poll done (new runs: ${newCount}).`);
+      } catch (err) {
+        console.warn('WCL forcecheck failed', err);
+        await interaction.editReply('Poll failed.');
+      }
+      return;
+    }
+
+    if (sub === 'listteams') {
+      const teams = listTeams();
+      if (!teams.length) {
+        await interaction.reply({ content: 'No teams configured.', flags: EPHEMERAL_FLAG });
+        return;
+      }
+      const fields = teams.slice(0, 25).map(team => {
+        const leader = team.leader_name || 'n/a';
+        const wcl = team.wcl_url || 'n/a';
+        const backup = team.wcl_backup_url || 'n/a';
+        return {
+          name: team.team_name || 'Unnamed team',
+          value: `Leader: ${leader}\nWCL: ${wcl}\nBackup: ${backup}`,
+          inline: false,
+        };
+      });
+      const embed = {
+        title: 'WCL Teams',
+        fields,
+      };
+      await interaction.reply({ embeds: [embed], flags: EPHEMERAL_FLAG });
+      return;
+    }
+
+    if (sub === 'team') {
+      const modal = new ModalBuilder()
+        .setCustomId(WCL_TEAM_MODAL)
+        .setTitle('Team setup');
+      const teamInput = new TextInputBuilder()
+        .setCustomId('wcl-team-name')
+        .setLabel('Team name')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+      const leaderInput = new TextInputBuilder()
+        .setCustomId('wcl-team-leader')
+        .setLabel('Team leader name')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+      const mainInput = new TextInputBuilder()
+        .setCustomId('wcl-team-main')
+        .setLabel('WCL main link/report')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+      const backupInput = new TextInputBuilder()
+        .setCustomId('wcl-team-backup')
+        .setLabel('WCL backup link/report (optional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false);
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(teamInput),
+        new ActionRowBuilder().addComponents(leaderInput),
+        new ActionRowBuilder().addComponents(mainInput),
+        new ActionRowBuilder().addComponents(backupInput)
+      );
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (sub === 'reloadteams') {
+      reloadWclData();
+      await interaction.reply({ content: 'Teams reloaded from disk.', flags: EPHEMERAL_FLAG });
+      return;
     }
   }
 });

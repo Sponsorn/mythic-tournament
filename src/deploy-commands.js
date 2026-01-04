@@ -117,6 +117,21 @@ const commands = [
     )
     .addSubcommand(sub =>
       sub
+        .setName('teamedit')
+        .setDescription('Edit a team by name or number')
+        .addStringOption(opt =>
+          opt
+            .setName('team_name')
+            .setDescription('Team name')
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('team_number')
+            .setDescription('Team number')
+        )
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('listteams')
         .setDescription('List current teams and WCL link availability')
     )

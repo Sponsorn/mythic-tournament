@@ -88,7 +88,10 @@ function teamNumber(teamName, teams) {
   const idx = teams.findIndex(
     t => String(t.team_name || '').toLowerCase() === String(teamName || '').toLowerCase()
   );
-  return idx >= 0 ? idx + 1 : null;
+  if (idx < 0) return null;
+  const team = teams[idx];
+  const num = Number(team?.team_number);
+  return Number.isFinite(num) && num > 0 ? num : idx + 1;
 }
 
 async function collectRunsAndSync() {

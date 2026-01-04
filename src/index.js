@@ -18,11 +18,15 @@ const {
   reloadData: reloadWclData,
   listTeams,
   upsertTeam,
+  updateTeam,
+  findTeam,
+  findTeamByNumber,
   getSeenWcl,
   readLeaderboardWcl,
   readWclMeta,
   readScores,
   SCORE_HEADER,
+  setTeamNumber,
 } = require('./wclStorage');
 const { normalizeRealmSlug, formatLocalTime, formatTable } = require('./wclUtils');
 
@@ -153,6 +157,18 @@ function parseChannelId(input) {
 
 function hasWclCreds() {
   return Boolean(WCL_CLIENT_ID && WCL_CLIENT_SECRET);
+}
+
+function encodeTeamKey(value) {
+  return Buffer.from(String(value || ''), 'utf8').toString('base64');
+}
+
+function decodeTeamKey(value) {
+  try {
+    return Buffer.from(String(value || ''), 'base64').toString('utf8');
+  } catch (err) {
+    return '';
+  }
 }
 
 async function resolveTextChannel(clientRef, channelId) {
@@ -432,11 +448,22 @@ client.on(Events.InteractionCreate, async interaction => {
       return;
     }
 
-    if (interaction.customId === WCL_TEAM_MODAL) {
+    if (interaction.customId === WCL_TEAM_MODAL || interaction.customId.startsWith(`${WCL_TEAM_MODAL}:`)) {
+      let targetName = null;
+      let targetNumber = null;
+      if (interaction.customId.startsWith(`${WCL_TEAM_MODAL}:edit:`)) {
+        const [, , kind, encoded] = interaction.customId.split(':');
+        if (kind === 'name') {
+          targetName = decodeTeamKey(encoded);
+        } else if (kind === 'number') {
+          targetNumber = Number(encoded);
+        }
+      }
       const teamName = interaction.fields.getTextInputValue('wcl-team-name')?.trim();
       const leaderName = interaction.fields.getTextInputValue('wcl-team-leader')?.trim();
       const wclMain = interaction.fields.getTextInputValue('wcl-team-main')?.trim();
       const wclBackup = interaction.fields.getTextInputValue('wcl-team-backup')?.trim();
+      const teamNumberInput = interaction.fields.getTextInputValue('wcl-team-number')?.trim();
 
       if (!teamName || !leaderName || !wclMain) {
         await interaction.reply({
@@ -446,12 +473,45 @@ client.on(Events.InteractionCreate, async interaction => {
         return;
       }
 
-      const result = upsertTeam({
-        teamName,
-        leaderName,
-        wclUrl: wclMain,
-        wclBackupUrl: wclBackup,
-      });
+      const result = targetName || Number.isFinite(targetNumber)
+        ? updateTeam({
+            teamName,
+            teamNumber: Number.isFinite(targetNumber) ? targetNumber : undefined,
+            leaderName,
+            wclUrl: wclMain,
+            wclBackupUrl: wclBackup,
+          })
+        : upsertTeam({
+            teamName,
+            leaderName,
+            wclUrl: wclMain,
+            wclBackupUrl: wclBackup,
+          });
+      if (result.status === 'missing') {
+        await interaction.reply({
+          content: 'Team not found.',
+          flags: EPHEMERAL_FLAG,
+        });
+        return;
+      }
+      if (teamNumberInput) {
+        const parsed = Number(teamNumberInput);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+          await interaction.reply({
+            content: 'Team number must be a positive number.',
+            flags: EPHEMERAL_FLAG,
+          });
+          return;
+        }
+        const setResult = setTeamNumber(teamName, parsed);
+        if (setResult.status === 'conflict') {
+          await interaction.reply({
+            content: `Team number ${parsed} is already assigned to ${setResult.conflict.team_name}. Assigned ${setResult.fallback} instead.`,
+            flags: EPHEMERAL_FLAG,
+          });
+          return;
+        }
+      }
       const msg =
         result.status === 'created'
           ? `Created team ${teamName}.`
@@ -680,7 +740,13 @@ client.on(Events.InteractionCreate, async interaction => {
       const meta = readWclMeta();
       const teams = listTeams();
       const teamIndex = new Map(
-        teams.map((team, idx) => [String(team.team_name || ''), idx + 1])
+        teams.map((team, idx) => {
+          const num = Number(team.team_number);
+          return [
+            String(team.team_name || ''),
+            Number.isFinite(num) && num > 0 ? num : idx + 1,
+          ];
+        })
       );
 
       const runsByTeam = {};
@@ -821,9 +887,10 @@ client.on(Events.InteractionCreate, async interaction => {
         const leader = team.leader_name || 'n/a';
         const wcl = team.wcl_url || 'n/a';
         const backup = team.wcl_backup_url || 'n/a';
+        const num = Number.isFinite(Number(team.team_number)) ? `Team ${team.team_number}` : 'Team n/a';
         return {
           name: team.team_name || 'Unnamed team',
-          value: `Leader: ${leader}\nWCL: ${wcl}\nBackup: ${backup}`,
+          value: `${num}\nLeader: ${leader}\nWCL: ${wcl}\nBackup: ${backup}`,
           inline: false,
         };
       });
@@ -859,11 +926,87 @@ client.on(Events.InteractionCreate, async interaction => {
         .setLabel('WCL backup link/report (optional)')
         .setStyle(TextInputStyle.Short)
         .setRequired(false);
+      const numberInput = new TextInputBuilder()
+        .setCustomId('wcl-team-number')
+        .setLabel('Team number (optional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false);
       modal.addComponents(
         new ActionRowBuilder().addComponents(teamInput),
         new ActionRowBuilder().addComponents(leaderInput),
         new ActionRowBuilder().addComponents(mainInput),
-        new ActionRowBuilder().addComponents(backupInput)
+        new ActionRowBuilder().addComponents(backupInput),
+        new ActionRowBuilder().addComponents(numberInput)
+      );
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (sub === 'teamedit') {
+      const teamName = interaction.options.getString('team_name');
+      const teamNumber = interaction.options.getInteger('team_number');
+      if (!teamName && !teamNumber) {
+        await interaction.reply({
+          content: 'Provide a team name or team number.',
+          flags: EPHEMERAL_FLAG,
+        });
+        return;
+      }
+      const team = Number.isFinite(teamNumber)
+        ? findTeamByNumber(teamNumber)
+        : findTeam(teamName);
+      if (!team) {
+        await interaction.reply({
+          content: 'Team not found.',
+          flags: EPHEMERAL_FLAG,
+        });
+        return;
+      }
+      const modal = new ModalBuilder()
+        .setCustomId(
+          Number.isFinite(teamNumber)
+            ? `${WCL_TEAM_MODAL}:edit:number:${teamNumber}`
+            : `${WCL_TEAM_MODAL}:edit:name:${encodeTeamKey(team.team_name)}`
+        )
+        .setTitle('Edit team');
+      const teamInput = new TextInputBuilder()
+        .setCustomId('wcl-team-name')
+        .setLabel('Team name')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(team.team_name || '');
+      const leaderInput = new TextInputBuilder()
+        .setCustomId('wcl-team-leader')
+        .setLabel('Team leader name')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(team.leader_name || '');
+      const mainInput = new TextInputBuilder()
+        .setCustomId('wcl-team-main')
+        .setLabel('WCL main link/report')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(team.wcl_url || '');
+      const backupInput = new TextInputBuilder()
+        .setCustomId('wcl-team-backup')
+        .setLabel('WCL backup link/report (optional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setValue(team.wcl_backup_url || '');
+      const numberInput = new TextInputBuilder()
+        .setCustomId('wcl-team-number')
+        .setLabel('Team number (optional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setValue(
+          Number.isFinite(Number(team.team_number)) ? String(team.team_number) : ''
+        );
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(teamInput),
+        new ActionRowBuilder().addComponents(leaderInput),
+        new ActionRowBuilder().addComponents(mainInput),
+        new ActionRowBuilder().addComponents(backupInput),
+        new ActionRowBuilder().addComponents(numberInput)
       );
       await interaction.showModal(modal);
       return;

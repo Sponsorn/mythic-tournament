@@ -35,6 +35,7 @@ function ensureTeamDefaults(team) {
     leader_name: team?.leader_name || '',
     wcl_url: team?.wcl_url || '',
     wcl_backup_url: team?.wcl_backup_url || '',
+    team_number: Number.isFinite(Number(team?.team_number)) ? Number(team.team_number) : null,
   };
 }
 
@@ -88,6 +89,14 @@ function findTeam(teamName) {
   return data.teams.find(t => String(t.team_name || '').toLowerCase() === key) || null;
 }
 
+function findTeamByNumber(teamNumber) {
+  const data = loadData();
+  const target = Number(teamNumber);
+  return (
+    data.teams.find(t => Number(t.team_number) === target) || null
+  );
+}
+
 function upsertTeam({ teamName, leaderName, wclUrl, wclBackupUrl }) {
   const data = loadData();
   const key = String(teamName || '').toLowerCase();
@@ -97,6 +106,9 @@ function upsertTeam({ teamName, leaderName, wclUrl, wclBackupUrl }) {
     existing.leader_name = leaderName || existing.leader_name || '';
     existing.wcl_url = wclUrl || '';
     existing.wcl_backup_url = wclBackupUrl || '';
+    if (!Number.isFinite(Number(existing.team_number))) {
+      existing.team_number = nextTeamNumber(data.teams);
+    }
     saveData();
     return { status: 'updated', team: existing };
   }
@@ -106,9 +118,64 @@ function upsertTeam({ teamName, leaderName, wclUrl, wclBackupUrl }) {
     wcl_url: wclUrl || '',
     wcl_backup_url: wclBackupUrl || '',
   });
+  if (!Number.isFinite(Number(team.team_number))) {
+    team.team_number = nextTeamNumber(data.teams);
+  }
   data.teams.push(team);
   saveData();
   return { status: 'created', team };
+}
+
+function updateTeam({ teamName, teamNumber, leaderName, wclUrl, wclBackupUrl }) {
+  const data = loadData();
+  let target = null;
+  if (Number.isFinite(Number(teamNumber))) {
+    target = data.teams.find(t => Number(t.team_number) === Number(teamNumber)) || null;
+  }
+  if (!target && teamName) {
+    const key = String(teamName || '').toLowerCase();
+    target = data.teams.find(t => String(t.team_name || '').toLowerCase() === key) || null;
+  }
+  if (!target) return { status: 'missing', team: null };
+  target.team_name = teamName || target.team_name;
+  target.leader_name = leaderName ?? target.leader_name;
+  target.wcl_url = wclUrl ?? target.wcl_url;
+  target.wcl_backup_url = wclBackupUrl ?? target.wcl_backup_url;
+  saveData();
+  return { status: 'updated', team: target };
+}
+
+function nextTeamNumber(teams) {
+  const used = new Set(
+    (teams || [])
+      .map(t => Number(t.team_number))
+      .filter(n => Number.isFinite(n) && n > 0)
+  );
+  let n = 1;
+  while (used.has(n)) n += 1;
+  return n;
+}
+
+function setTeamNumber(teamName, teamNumber) {
+  const data = loadData();
+  const key = String(teamName || '').toLowerCase();
+  const existing = data.teams.find(t => String(t.team_name || '').toLowerCase() === key);
+  if (!existing) return { status: 'missing', team: null };
+  const nextNum = Number(teamNumber);
+  const conflict = data.teams.find(
+    t =>
+      String(t.team_name || '').toLowerCase() !== key &&
+      Number(t.team_number) === nextNum
+  );
+  if (conflict) {
+    const fallback = nextTeamNumber(data.teams);
+    existing.team_number = fallback;
+    saveData();
+    return { status: 'conflict', team: existing, conflict, fallback };
+  }
+  existing.team_number = nextNum;
+  saveData();
+  return { status: 'updated', team: existing };
 }
 
 function saveTeams(teams) {
@@ -222,7 +289,10 @@ module.exports = {
   reloadData,
   getTeams,
   findTeam,
+  findTeamByNumber,
   upsertTeam,
+  updateTeam,
+  setTeamNumber,
   saveTeams,
   listTeams,
   getSeenWcl,

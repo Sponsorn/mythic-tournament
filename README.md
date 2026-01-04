@@ -27,7 +27,8 @@ Discord bot that tracks unique reactions per message, runs competitions, and pro
 - `/wcl scoreboard` - show WCL standings.
 - `/wcl teamruns team_name?:<text> limit?:(5|10|25|50)` - show recent runs.
 - `/wcl forcecheck` - poll WCL now and announce new runs.
-- `/wcl team` - create or update a team (name, leader, WCL main/backup).
+- `/wcl team` - create or update a team (name, leader, WCL main/backup, optional team number).
+- `/wcl teamedit team_name?:<text> team_number?:<int>` - edit a team and prefill the modal.
 - `/wcl listteams` - list current teams and WCL links.
 - `/wcl reloadteams` - reload teams from disk.
 

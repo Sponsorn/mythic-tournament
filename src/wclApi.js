@@ -1,7 +1,5 @@
-const WCL_CLIENT_ID = process.env.WCL_CLIENT_ID;
-const WCL_CLIENT_SECRET = process.env.WCL_CLIENT_SECRET;
-const WCL_TOKEN_URL = 'https://www.warcraftlogs.com/oauth/token';
-const WCL_GQL_CLIENT = 'https://www.warcraftlogs.com/api/v2/client';
+const { WCL_CLIENT_ID, WCL_CLIENT_SECRET, WCL_TOKEN_URL, WCL_GQL_CLIENT } = require('./config');
+const { fetchWithRetry } = require('./apiUtils');
 
 const CODE_RE = /(?:^|\/reports\/)([A-Za-z0-9]{16})(?:[/?#].*)?$/;
 
@@ -25,13 +23,16 @@ async function wclGetToken() {
     throw new Error('Missing WCL_CLIENT_ID / WCL_CLIENT_SECRET');
   }
   const auth = Buffer.from(`${WCL_CLIENT_ID}:${WCL_CLIENT_SECRET}`).toString('base64');
-  const res = await fetch(WCL_TOKEN_URL, {
+  const res = await fetchWithRetry(WCL_TOKEN_URL, {
     method: 'POST',
     headers: {
       Authorization: `Basic ${auth}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({ grant_type: 'client_credentials' }),
+  }, {
+    maxRetries: 3,
+    baseDelay: 1000,
   });
   const body = await res.json();
   if (!res.ok) {
@@ -44,13 +45,16 @@ async function wclGetToken() {
 
 async function wclGraphql(query, variables) {
   const token = await wclGetToken();
-  const res = await fetch(WCL_GQL_CLIENT, {
+  const res = await fetchWithRetry(WCL_GQL_CLIENT, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query, variables: variables || {} }),
+  }, {
+    maxRetries: 3,
+    baseDelay: 1000,
   });
   const body = await res.json();
   if (!res.ok || body.errors || !body.data) {

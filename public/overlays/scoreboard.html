@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament Scoreboard</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/scoreboard.css">
+</head>
+<body>
+  <div class="scoreboard" id="scoreboard">
+    <div class="scoreboard-header">
+      <div class="scoreboard-title">M+ Tournament</div>
+      <div class="scoreboard-subtitle" id="subtitle">Live Standings</div>
+    </div>
+
+    <div class="scoreboard-columns">
+      <div>#</div>
+      <div>Team</div>
+      <div style="text-align: right;">Score</div>
+      <div style="text-align: center;">Status</div>
+    </div>
+
+    <div class="scoreboard-body" id="leaderboard">
+      <div class="scoreboard-empty">Connecting...</div>
+    </div>
+
+    <div class="scoreboard-footer">
+      <div class="api-status ok" id="apiStatus">
+        <span class="status-dot"></span>
+        <span id="apiUsage">API: --/3600</span>
+      </div>
+      <div id="lastUpdate">--</div>
+    </div>
+  </div>
+
+  <div class="connection-status" id="connectionStatus">Disconnected</div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script>
+    const client = initTournamentClient();
+    const leaderboardEl = document.getElementById('leaderboard');
+    const apiStatusEl = document.getElementById('apiStatus');
+    const apiUsageEl = document.getElementById('apiUsage');
+    const lastUpdateEl = document.getElementById('lastUpdate');
+    const connectionStatusEl = document.getElementById('connectionStatus');
+
+    let previousRanks = {};
+
+    client.on('connected', () => {
+      connectionStatusEl.classList.remove('visible', 'disconnected');
+    });
+
+    client.on('disconnected', () => {
+      connectionStatusEl.textContent = 'Disconnected';
+      connectionStatusEl.classList.add('visible', 'disconnected');
+    });
+
+    client.on('state:sync', (state) => {
+      renderLeaderboard(state.leaderboard);
+      updateApiStatus(state.apiQuota);
+      updateLastPoll(state.lastPollTime);
+    });
+
+    client.on('scoreboard:update', (leaderboard) => {
+      renderLeaderboard(leaderboard);
+    });
+
+    client.on('quota:update', (quota) => {
+      updateApiStatus(quota);
+    });
+
+    function renderLeaderboard(leaderboard) {
+      if (!leaderboard || leaderboard.length === 0) {
+        leaderboardEl.innerHTML = '<div class="scoreboard-empty">No teams registered</div>';
+        return;
+      }
+
+      const html = leaderboard.map((entry, index) => {
+        const prevRank = previousRanks[entry.teamName];
+        let rankChangeClass = '';
+        let rankChangeHtml = '';
+
+        if (prevRank !== undefined && prevRank !== entry.rank) {
+          if (entry.rank < prevRank) {
+            rankChangeClass = 'rank-changed';
+            rankChangeHtml = `<span class="rank-change up">▲${prevRank - entry.rank}</span>`;
+          } else {
+            rankChangeClass = 'rank-changed';
+            rankChangeHtml = `<span class="rank-change down">▼${entry.rank - prevRank}</span>`;
+          }
+        }
+
+        const statusClass = entry.status === 'running' ? 'running' : '';
+        const statusText = entry.status === 'running' ? 'LIVE' : '';
+
+        return `
+          <div class="team-row ${rankChangeClass}" data-team="${entry.teamName}">
+            <div class="team-rank">${entry.rank}</div>
+            <div class="team-info">
+              <div class="team-name">${escapeHtml(entry.teamName)}${rankChangeHtml}</div>
+              <div class="team-meta">${entry.runs} run${entry.runs !== 1 ? 's' : ''}</div>
+            </div>
+            <div class="team-score" data-score="${entry.points}">${formatNumber(entry.points)}</div>
+            <div class="team-status">
+              <div class="status-indicator ${statusClass}">
+                <span class="status-dot"></span>
+                <span>${statusText}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      leaderboardEl.innerHTML = html;
+
+      // Store current ranks for next comparison
+      previousRanks = {};
+      for (const entry of leaderboard) {
+        previousRanks[entry.teamName] = entry.rank;
+      }
+    }
+
+    function updateApiStatus(quota) {
+      if (!quota) return;
+
+      const used = quota.used || 0;
+      const limit = quota.limit || 3600;
+      const percentage = (used / limit) * 100;
+
+      apiUsageEl.textContent = `API: ${used}/${limit}`;
+
+      if (percentage >= 80) {
+        apiStatusEl.classList.remove('ok');
+        apiStatusEl.classList.add('warning');
+      } else {
+        apiStatusEl.classList.remove('warning');
+        apiStatusEl.classList.add('ok');
+      }
+    }
+
+    function updateLastPoll(time) {
+      if (!time) {
+        lastUpdateEl.textContent = '--';
+        return;
+      }
+
+      const date = new Date(time);
+      lastUpdateEl.textContent = date.toLocaleTimeString();
+    }
+
+    function formatNumber(num) {
+      return (num || 0).toLocaleString();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>

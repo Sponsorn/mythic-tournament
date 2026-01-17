@@ -22,6 +22,7 @@ const SCORE_HEADER = [
   'in_time',
   'points',
   'deaths',
+  'duration_ms',
   'character',
   'realm',
   'region',
@@ -211,6 +212,28 @@ function readLeaderboardWcl() {
   return data.leaderboardWcl || {};
 }
 
+function renameTeamInLeaderboard(oldName, newName) {
+  const data = loadData();
+  const oldKey = String(oldName || '');
+  const newKey = String(newName || '');
+  if (oldKey === newKey || !oldKey || !newKey) return false;
+
+  // Rename in leaderboard
+  if (data.leaderboardWcl && data.leaderboardWcl[oldKey] !== undefined) {
+    data.leaderboardWcl[newKey] = data.leaderboardWcl[oldKey];
+    delete data.leaderboardWcl[oldKey];
+  }
+
+  // Rename in wclMeta
+  if (data.wclMeta && data.wclMeta[oldKey] !== undefined) {
+    data.wclMeta[newKey] = data.wclMeta[oldKey];
+    delete data.wclMeta[oldKey];
+  }
+
+  saveData();
+  return true;
+}
+
 function readWclMeta() {
   const data = loadData();
   return data.wclMeta || {};
@@ -284,6 +307,66 @@ function readScores() {
   return lines.slice(1).map(parseCsvLine);
 }
 
+function readScoresAsObjects() {
+  if (!fs.existsSync(WCL_SCORES)) return [];
+  const raw = fs.readFileSync(WCL_SCORES, 'utf8');
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  if (lines.length <= 1) return [];
+
+  return lines.slice(1).map(line => {
+    const values = parseCsvLine(line);
+    const obj = {};
+    SCORE_HEADER.forEach((key, i) => {
+      obj[key] = values[i] || '';
+    });
+    // Parse numeric fields
+    obj.level = parseInt(obj.level, 10) || 0;
+    obj.upgrades = parseInt(obj.upgrades, 10) || 0;
+    obj.blizz_rating = parseInt(obj.blizz_rating, 10) || 0;
+    obj.in_time = obj.in_time === '1' || obj.in_time === 'true';
+    obj.points = parseInt(obj.points, 10) || 0;
+    obj.deaths = parseInt(obj.deaths, 10) || 0;
+    obj.duration_ms = parseInt(obj.duration_ms, 10) || 0;
+    return obj;
+  });
+}
+
+function getBestRunsPerDungeon(dungeonFilter = null) {
+  const scores = readScoresAsObjects();
+  const dungeons = {};
+
+  for (const run of scores) {
+    if (!run.dungeon || !run.in_time) continue;
+    if (dungeonFilter && run.dungeon !== dungeonFilter) continue;
+
+    if (!dungeons[run.dungeon]) {
+      dungeons[run.dungeon] = [];
+    }
+    dungeons[run.dungeon].push(run);
+  }
+
+  // Sort each dungeon's runs by points desc, then by duration asc
+  for (const dungeon of Object.keys(dungeons)) {
+    dungeons[dungeon].sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      return a.duration_ms - b.duration_ms;
+    });
+  }
+
+  return dungeons;
+}
+
+function getAllDungeonNames() {
+  const scores = readScoresAsObjects();
+  const names = new Set();
+  for (const run of scores) {
+    if (run.dungeon) {
+      names.add(run.dungeon);
+    }
+  }
+  return Array.from(names).sort();
+}
+
 module.exports = {
   ensureFiles,
   reloadData,
@@ -299,9 +382,13 @@ module.exports = {
   saveSeenWcl,
   updateLeaderboardWcl,
   readLeaderboardWcl,
+  renameTeamInLeaderboard,
   readWclMeta,
   updateWclMeta,
   writeScoreRow,
   readScores,
+  readScoresAsObjects,
+  getBestRunsPerDungeon,
+  getAllDungeonNames,
   SCORE_HEADER,
 };

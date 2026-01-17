@@ -13,66 +13,29 @@ const {
   updateWclMeta,
   writeScoreRow,
 } = require('./wclStorage');
+const {
+  REALM_TZ,
+  EVENT_START_SE,
+  EVENT_END_SE,
+  EVENT_ENFORCE_WINDOW,
+  WCL_REQUIRE_KILL,
+  MPLUS_DEATH_PENALTY_LT12,
+  MPLUS_DEATH_PENALTY_GE12,
+  MPLUS_START_OFFSET_MS,
+} = require('./config');
+const { parseLocalDateTime, formatTimerMs } = require('./timeUtils');
 
-const REALM_TZ = process.env.REALM_TZ || 'Europe/Stockholm';
-const EVENT_START_SE = process.env.EVENT_START_SE;
-const EVENT_END_SE = process.env.EVENT_END_SE;
-const EVENT_ENFORCE_WINDOW = String(process.env.EVENT_ENFORCE_WINDOW || 'false').toLowerCase() === 'true';
-const WCL_REQUIRE_KILL = String(process.env.WCL_REQUIRE_KILL || 'true').toLowerCase() === 'true';
-const MPLUS_DEATH_PENALTY_LT12 = Number(process.env.MPLUS_DEATH_PENALTY_LT12 || 5);
-const MPLUS_DEATH_PENALTY_GE12 = Number(process.env.MPLUS_DEATH_PENALTY_GE12 || 15);
-
-function getOffsetForDate(date, timeZone) {
-  const fmt = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    timeZoneName: 'shortOffset',
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  const parts = fmt.formatToParts(date);
-  const tzName = parts.find(p => p.type === 'timeZoneName')?.value || '';
-  const match = tzName.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/i);
-  if (!match) return '+01:00';
-  const hours = match[1].padStart(match[1].startsWith('-') ? 3 : 2, '0');
-  const minutes = match[2] || '00';
-  return `${hours}:${minutes}`;
-}
-
-function toLocalIso(dateTimeStr, timeZone) {
-  const match = String(dateTimeStr || '').match(
-    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/
-  );
-  if (!match) return null;
-  const [, y, m, d, hh, mm] = match;
-  const probe = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm)));
-  const offset = getOffsetForDate(probe, timeZone);
-  const isoCandidate = `${y}-${m}-${d}T${hh}:${mm}:00${offset}`;
-  const parsed = Date.parse(isoCandidate);
-  if (Number.isNaN(parsed)) return null;
-  return new Date(parsed).toISOString();
-}
-
+/**
+ * Parses event window from environment configuration
+ * @returns {{start: Date|null, end: Date|null}}
+ */
 function parseEventWindow() {
-  const startIso = EVENT_START_SE ? toLocalIso(EVENT_START_SE, REALM_TZ) : null;
-  const endIso = EVENT_END_SE ? toLocalIso(EVENT_END_SE, REALM_TZ) : null;
+  const startIso = EVENT_START_SE ? parseLocalDateTime(EVENT_START_SE, REALM_TZ) : null;
+  const endIso = EVENT_END_SE ? parseLocalDateTime(EVENT_END_SE, REALM_TZ) : null;
   return {
     start: startIso ? new Date(startIso) : null,
     end: endIso ? new Date(endIso) : null,
   };
-}
-
-function fmtTimerMs(ms) {
-  if (ms <= 0) return '0:00';
-  const total = Math.floor(ms / 1000);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function collectCodes(team) {
@@ -173,7 +136,6 @@ async function collectRunsAndSync() {
         if (keystoneTime > 0) {
           adjustedClearMs = keystoneTime;
         } else {
-          const MPLUS_START_OFFSET_MS = 10 * 1000;
           const clearMs = Math.max(0, enAbs - stAbs - MPLUS_START_OFFSET_MS);
           const penaltySec = lvl < 12 ? MPLUS_DEATH_PENALTY_LT12 : MPLUS_DEATH_PENALTY_GE12;
           adjustedClearMs = clearMs + Math.max(0, deaths) * Number(penaltySec) * 1000;
@@ -219,7 +181,7 @@ async function collectRunsAndSync() {
           region: '',
         });
 
-        const timerStr = fmtTimerMs(adjustedClearMs);
+        const timerStr = formatTimerMs(adjustedClearMs);
         const num = teamNumber(teamName, teams);
         const teamLabel = num ? `${teamName} (Team ${num})` : teamName;
         const upgLabel = inTime ? `+${upgrades}` : 'depleted';

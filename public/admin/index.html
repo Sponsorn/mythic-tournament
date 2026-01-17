@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament - Admin Dashboard</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-container">
+    <header class="admin-header">
+      <div>
+        <h1 class="admin-title">M+ Tournament Admin</h1>
+        <p class="admin-subtitle">Manage teams, monitor runs, and control the tournament</p>
+      </div>
+      <div class="connection-badge" id="connectionBadge">
+        <span class="status-dot"></span>
+        <span id="connectionText">Connecting...</span>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="admin-nav">
+      <a href="/admin/" class="nav-link active">Dashboard</a>
+      <a href="/admin/best-times.html" class="nav-link">Best Times</a>
+    </nav>
+
+    <!-- Status Cards -->
+    <div class="status-grid">
+      <div class="status-card" id="teamsCard">
+        <div class="label">Teams</div>
+        <div class="value" id="teamsCount">0</div>
+      </div>
+      <div class="status-card" id="activeCard">
+        <div class="label">Active Runs</div>
+        <div class="value" id="activeCount">0</div>
+      </div>
+      <div class="status-card" id="quotaCard">
+        <div class="label">API Quota</div>
+        <div class="value" id="quotaUsage">0/3600</div>
+      </div>
+      <div class="status-card" id="statusCard">
+        <div class="label">Tournament</div>
+        <div class="value" id="tournamentStatus">--</div>
+      </div>
+    </div>
+
+    <!-- Tournament Controls -->
+    <div class="controls-section">
+      <h2 class="section-title">Tournament Controls</h2>
+      <div class="control-buttons">
+        <button class="btn btn-success" id="resumeBtn">Resume Polling</button>
+        <button class="btn btn-warning" id="pauseBtn">Pause Polling</button>
+        <button class="btn btn-secondary" id="refreshAllBtn">Force Refresh All</button>
+      </div>
+    </div>
+
+    <!-- Teams Table -->
+    <div class="teams-section">
+      <div class="teams-header">
+        <h2 class="section-title" style="margin: 0;">Teams</h2>
+      </div>
+      <table class="teams-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Team Name</th>
+            <th>Report Code</th>
+            <th>Status</th>
+            <th>Score</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="teamsBody">
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Recent Runs -->
+    <div class="recent-section">
+      <div class="recent-header">
+        <h2 class="section-title" style="margin: 0;">Recent Completed Runs</h2>
+      </div>
+      <div class="recent-list" id="recentList">
+        <div class="recent-item" style="justify-content: center; color: var(--text-muted);">
+          No completed runs yet
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Team</h3>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editOriginalName">
+        <div class="form-group">
+          <label class="form-label">Team Name</label>
+          <input type="text" class="input" id="editTeamName" placeholder="Team name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Leader Name</label>
+          <input type="text" class="input" id="editLeaderName" placeholder="Team leader name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Primary Report Code (URL or 16-char code)</label>
+          <input type="text" class="input" id="editReportCode" placeholder="https://www.warcraftlogs.com/reports/...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Backup Report Code (optional)</label>
+          <input type="text" class="input" id="editBackupCode" placeholder="Optional backup report">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveEditBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script>
+    const client = initTournamentClient();
+
+    // DOM Elements
+    const connectionBadge = document.getElementById('connectionBadge');
+    const connectionText = document.getElementById('connectionText');
+    const teamsCount = document.getElementById('teamsCount');
+    const activeCount = document.getElementById('activeCount');
+    const quotaUsage = document.getElementById('quotaUsage');
+    const quotaCard = document.getElementById('quotaCard');
+    const tournamentStatus = document.getElementById('tournamentStatus');
+    const teamsBody = document.getElementById('teamsBody');
+    const recentList = document.getElementById('recentList');
+    const editModal = document.getElementById('editModal');
+    const toastContainer = document.getElementById('toastContainer');
+
+    // State
+    let teams = [];
+    let leaderboard = [];
+    let recentRuns = [];
+
+    // Connection events
+    client.on('connected', () => {
+      connectionBadge.classList.add('connected');
+      connectionBadge.classList.remove('disconnected');
+      connectionText.textContent = 'Connected';
+    });
+
+    client.on('disconnected', () => {
+      connectionBadge.classList.add('disconnected');
+      connectionBadge.classList.remove('connected');
+      connectionText.textContent = 'Disconnected';
+    });
+
+    // State sync
+    client.on('state:sync', (state) => {
+      teams = state.teams || [];
+      leaderboard = state.leaderboard || [];
+      recentRuns = state.recentRuns || [];
+
+      updateStatusCards(state);
+      renderTeams();
+      renderRecentRuns();
+    });
+
+    client.on('teams:update', (newTeams) => {
+      teams = newTeams;
+      renderTeams();
+    });
+
+    client.on('scoreboard:update', (newLeaderboard) => {
+      leaderboard = newLeaderboard;
+      renderTeams();
+    });
+
+    client.on('quota:update', (quota) => {
+      updateQuota(quota);
+    });
+
+    client.on('run:complete', (data) => {
+      recentRuns.unshift(data.recap);
+      if (recentRuns.length > 10) recentRuns = recentRuns.slice(0, 10);
+      renderRecentRuns();
+    });
+
+    client.on('tournament:status', (data) => {
+      tournamentStatus.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+    });
+
+    client.on('admin:response', (response) => {
+      showToast(response.message, response.success ? 'success' : 'error');
+    });
+
+    // Update functions
+    function updateStatusCards(state) {
+      teamsCount.textContent = state.teams?.length || 0;
+      activeCount.textContent = state.activeRuns?.length || 0;
+      tournamentStatus.textContent = state.tournament?.status || 'Unknown';
+      updateQuota(state.apiQuota);
+    }
+
+    function updateQuota(quota) {
+      if (!quota) return;
+      const used = quota.used || 0;
+      const limit = quota.limit || 3600;
+      const percentage = (used / limit) * 100;
+
+      quotaUsage.textContent = `${used}/${limit}`;
+      quotaCard.classList.remove('warning', 'ok');
+      quotaCard.classList.add(percentage >= 80 ? 'warning' : 'ok');
+    }
+
+    function renderTeams() {
+      if (!teams.length) {
+        teamsBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No teams registered</td></tr>';
+        return;
+      }
+
+      const html = teams.map(team => {
+        const entry = leaderboard.find(e => e.teamName === team.name);
+        const score = entry?.points || 0;
+        const status = entry?.status || team.status || 'idle';
+        const statusClass = status === 'running' ? 'running' : '';
+        const code = extractCode(team.wclUrl);
+
+        return `
+          <tr data-team="${escapeHtml(team.name)}">
+            <td class="team-number">${team.id || '-'}</td>
+            <td class="team-name-cell">${escapeHtml(team.name)}</td>
+            <td class="team-code">${code || '<span style="color: var(--accent-yellow);">Not set</span>'}</td>
+            <td class="team-status-cell">
+              <span class="status-indicator ${statusClass}">
+                <span class="status-dot"></span>
+                ${status === 'running' ? 'Running' : 'Idle'}
+              </span>
+            </td>
+            <td style="font-family: var(--font-mono);">${score.toLocaleString()}</td>
+            <td class="team-actions">
+              <button class="btn btn-secondary btn-sm" onclick="editTeam('${escapeHtml(team.name)}', '${code || ''}')">Edit</button>
+              <button class="btn btn-primary btn-sm" onclick="refreshTeam('${escapeHtml(team.name)}')">Refresh</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      teamsBody.innerHTML = html;
+    }
+
+    function renderRecentRuns() {
+      if (!recentRuns.length) {
+        recentList.innerHTML = '<div class="recent-item" style="justify-content: center; color: var(--text-muted);">No completed runs yet</div>';
+        return;
+      }
+
+      const html = recentRuns.map((run, index) => {
+        const timedClass = run.timed ? 'timed' : 'depleted';
+        return `
+          <div class="recent-item">
+            <div class="recent-info">
+              <div class="recent-team">${escapeHtml(run.teamName)}</div>
+              <div class="recent-dungeon">${escapeHtml(run.dungeonName)} +${run.keystoneLevel}</div>
+              <div class="recent-details">
+                ${formatTime(run.duration)} | ${run.deaths} deaths | ${run.timed ? 'Timed' : 'Depleted'}
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+              <div class="recent-points">${run.points}</div>
+              <button class="btn btn-secondary btn-sm" onclick="showRecap(${index})">Show Recap</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      recentList.innerHTML = html;
+    }
+
+    // Control buttons
+    document.getElementById('resumeBtn').addEventListener('click', () => {
+      client.resumeTournament();
+    });
+
+    document.getElementById('pauseBtn').addEventListener('click', () => {
+      client.pauseTournament();
+    });
+
+    document.getElementById('refreshAllBtn').addEventListener('click', () => {
+      teams.forEach(team => {
+        client.forceRefresh(team.name);
+      });
+      showToast('Refreshing all teams...', 'success');
+    });
+
+    // Edit modal
+    function editTeam(teamName, currentCode) {
+      const team = teams.find(t => t.name === teamName);
+      document.getElementById('editOriginalName').value = teamName;
+      document.getElementById('editTeamName').value = teamName;
+      document.getElementById('editLeaderName').value = team?.leaderName || '';
+      document.getElementById('editReportCode').value = currentCode;
+      document.getElementById('editBackupCode').value = '';
+      editModal.classList.add('visible');
+    }
+
+    document.getElementById('cancelEditBtn').addEventListener('click', () => {
+      editModal.classList.remove('visible');
+    });
+
+    document.getElementById('saveEditBtn').addEventListener('click', () => {
+      const originalName = document.getElementById('editOriginalName').value;
+      const newTeamName = document.getElementById('editTeamName').value.trim();
+      const leaderName = document.getElementById('editLeaderName').value.trim();
+      const reportCode = document.getElementById('editReportCode').value;
+      const backupCode = document.getElementById('editBackupCode').value;
+
+      if (!newTeamName) {
+        showToast('Team name is required', 'error');
+        return;
+      }
+
+      client.updateTeam(originalName, newTeamName, leaderName, reportCode, backupCode || null);
+      editModal.classList.remove('visible');
+    });
+
+    // Click outside modal to close
+    editModal.addEventListener('click', (e) => {
+      if (e.target === editModal) {
+        editModal.classList.remove('visible');
+      }
+    });
+
+    // Team actions
+    function refreshTeam(teamName) {
+      client.forceRefresh(teamName);
+    }
+
+    function showRecap(index) {
+      client.showRecap(index, 15000);
+    }
+
+    // Toast notifications
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      toastContainer.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.add('exiting');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Utility functions
+    function extractCode(url) {
+      if (!url) return '';
+      const match = url.match(/\/reports\/([A-Za-z0-9]{16})/);
+      return match ? match[1] : url.substring(0, 16);
+    }
+
+    function formatTime(ms) {
+      if (!ms || ms < 0) return '00:00';
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
+    // Make functions available globally
+    window.editTeam = editTeam;
+    window.refreshTeam = refreshTeam;
+    window.showRecap = showRecap;
+  </script>
+</body>
+</html>

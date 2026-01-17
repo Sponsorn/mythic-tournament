@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament - Best Times</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-container">
+    <header class="admin-header">
+      <div>
+        <h1 class="admin-title">Best Times by Dungeon</h1>
+        <p class="admin-subtitle">View top runs per dungeon, sorted by points</p>
+      </div>
+      <div class="connection-badge" id="connectionBadge">
+        <span class="status-dot"></span>
+        <span id="connectionText">Connecting...</span>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="admin-nav">
+      <a href="/admin/" class="nav-link">Dashboard</a>
+      <a href="/admin/best-times.html" class="nav-link active">Best Times</a>
+    </nav>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+      <div class="form-group" style="margin: 0; max-width: 400px;">
+        <label class="form-label">Filter by Dungeon</label>
+        <select class="input" id="dungeonFilter">
+          <option value="">All Dungeons</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Best Times Tables -->
+    <div id="bestTimesContainer">
+      <div class="loading-message">Loading best times...</div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script>
+    const client = initTournamentClient();
+
+    // DOM Elements
+    const connectionBadge = document.getElementById('connectionBadge');
+    const connectionText = document.getElementById('connectionText');
+    const dungeonFilter = document.getElementById('dungeonFilter');
+    const bestTimesContainer = document.getElementById('bestTimesContainer');
+
+    // State
+    let dungeons = [];
+    let bestTimes = {};
+
+    // Connection events
+    client.on('connected', () => {
+      connectionBadge.classList.add('connected');
+      connectionBadge.classList.remove('disconnected');
+      connectionText.textContent = 'Connected';
+      loadData();
+    });
+
+    client.on('disconnected', () => {
+      connectionBadge.classList.add('disconnected');
+      connectionBadge.classList.remove('connected');
+      connectionText.textContent = 'Disconnected';
+    });
+
+    // Load data on page load
+    async function loadData() {
+      try {
+        // Load dungeon names
+        const dungeonRes = await fetch('/api/dungeons');
+        dungeons = await dungeonRes.json();
+        populateDungeonFilter();
+
+        // Load best times
+        await loadBestTimes();
+      } catch (err) {
+        console.error('Failed to load data:', err);
+        bestTimesContainer.innerHTML = '<div class="error-message">Failed to load data</div>';
+      }
+    }
+
+    function populateDungeonFilter() {
+      dungeonFilter.innerHTML = '<option value="">All Dungeons</option>';
+      dungeons.forEach(dungeon => {
+        const option = document.createElement('option');
+        option.value = dungeon;
+        option.textContent = dungeon;
+        dungeonFilter.appendChild(option);
+      });
+    }
+
+    async function loadBestTimes() {
+      const filter = dungeonFilter.value;
+      const url = filter ? `/api/best-times?dungeon=${encodeURIComponent(filter)}` : '/api/best-times';
+
+      try {
+        const res = await fetch(url);
+        bestTimes = await res.json();
+        renderBestTimes();
+      } catch (err) {
+        console.error('Failed to load best times:', err);
+      }
+    }
+
+    function renderBestTimes() {
+      const dungeonNames = Object.keys(bestTimes).sort();
+
+      if (dungeonNames.length === 0) {
+        bestTimesContainer.innerHTML = '<div class="empty-message">No completed runs yet</div>';
+        return;
+      }
+
+      let html = '';
+
+      for (const dungeon of dungeonNames) {
+        const runs = bestTimes[dungeon];
+        if (!runs || runs.length === 0) continue;
+
+        html += `
+          <div class="dungeon-section">
+            <h2 class="section-title">${escapeHtml(dungeon)}</h2>
+            <table class="teams-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Team</th>
+                  <th>Level</th>
+                  <th>Upgrades</th>
+                  <th>Time</th>
+                  <th>Deaths</th>
+                  <th>Points</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        runs.forEach((run, index) => {
+          const upgradeStars = getUpgradeStars(run.upgrades);
+          html += `
+            <tr class="${index === 0 ? 'best-run' : ''}">
+              <td class="rank-cell">${index + 1}</td>
+              <td class="team-name-cell">${escapeHtml(run.team)}</td>
+              <td class="level-cell">+${run.level}</td>
+              <td class="upgrades-cell">${upgradeStars}</td>
+              <td class="time-cell">${formatDuration(run.duration_ms)}</td>
+              <td class="deaths-cell">${run.deaths}</td>
+              <td class="points-cell">${run.points}</td>
+              <td class="date-cell">${formatDate(run.finished_at_realm)}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      bestTimesContainer.innerHTML = html;
+    }
+
+    // Filter change handler
+    dungeonFilter.addEventListener('change', loadBestTimes);
+
+    // Utility functions
+    function getUpgradeStars(upgrades) {
+      if (upgrades === 3) return '<span class="upgrade-stars three">+++</span>';
+      if (upgrades === 2) return '<span class="upgrade-stars two">++</span>';
+      if (upgrades === 1) return '<span class="upgrade-stars one">+</span>';
+      return '<span class="upgrade-stars zero">-</span>';
+    }
+
+    function formatDuration(ms) {
+      if (!ms || ms <= 0) return '--:--';
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function formatDate(isoString) {
+      if (!isoString) return '-';
+      try {
+        const date = new Date(isoString);
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return '-';
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
+    // Initial load if already connected
+    if (client.isConnected()) {
+      loadData();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+/* Scoreboard Overlay Styles */
+
+.scoreboard {
+  width: 400px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+
+/* Header */
+.scoreboard-header {
+  background: var(--bg-secondary);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.scoreboard-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.scoreboard-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Column Headers */
+.scoreboard-columns {
+  display: grid;
+  grid-template-columns: 40px 1fr 80px 50px;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--bg-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Team Rows */
+.scoreboard-body {
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.team-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 80px 50px;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background var(--transition-fast), transform var(--transition-slow);
+}
+
+.team-row:last-child {
+  border-bottom: none;
+}
+
+.team-row:hover {
+  background: var(--bg-hover);
+}
+
+.team-row.rank-changed {
+  background: rgba(74, 222, 128, 0.1);
+}
+
+/* Rank Column */
+.team-rank {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.team-row:nth-child(1) .team-rank {
+  color: #ffd700;
+}
+
+.team-row:nth-child(2) .team-rank {
+  color: #c0c0c0;
+}
+
+.team-row:nth-child(3) .team-rank {
+  color: #cd7f32;
+}
+
+/* Team Name Column */
+.team-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.team-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Score Column */
+.team-score {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.team-score.score-updated {
+  animation: countUp var(--transition-fast);
+  color: var(--accent-green);
+}
+
+/* Status Column */
+.team-status {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.status-indicator.running {
+  color: var(--status-active);
+}
+
+.status-indicator.running .status-dot {
+  background: var(--status-active);
+  animation: pulse 1s infinite;
+}
+
+/* Footer */
+.scoreboard-footer {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.api-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.api-status .status-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.api-status.warning .status-dot {
+  background: var(--status-warning);
+}
+
+.api-status.ok .status-dot {
+  background: var(--status-active);
+}
+
+/* Connection Status */
+.connection-status {
+  position: fixed;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.connection-status.visible {
+  opacity: 1;
+}
+
+.connection-status.disconnected {
+  color: var(--accent-red);
+}
+
+/* Rank change indicators */
+.rank-change {
+  font-size: 10px;
+  margin-left: var(--spacing-xs);
+}
+
+.rank-change.up {
+  color: var(--accent-green);
+}
+
+.rank-change.down {
+  color: var(--accent-red);
+}
+
+/* Empty state */
+.scoreboard-empty {
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--text-muted);
+}

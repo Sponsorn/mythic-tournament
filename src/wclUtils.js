@@ -1,3 +1,8 @@
+/**
+ * Normalizes a WoW realm name to a slug format
+ * @param {string} value - Realm name
+ * @returns {string} Normalized slug
+ */
 function normalizeRealmSlug(value) {
   const raw = String(value || '').trim().toLowerCase();
   if (!raw) return '';
@@ -7,6 +12,12 @@ function normalizeRealmSlug(value) {
     .replace(/[^a-z0-9-]/g, '');
 }
 
+/**
+ * Formats an ISO date string to local time
+ * @param {string} isoStr - ISO 8601 date string
+ * @param {string} timeZone - IANA timezone name
+ * @returns {string} Formatted date string
+ */
 function formatLocalTime(isoStr, timeZone) {
   if (!isoStr) return '';
   try {
@@ -26,6 +37,12 @@ function formatLocalTime(isoStr, timeZone) {
   }
 }
 
+/**
+ * Formats data into an ASCII table
+ * @param {string[]} headers - Column headers
+ * @param {Array<Array<any>>} rows - Data rows
+ * @returns {string} Formatted table
+ */
 function formatTable(headers, rows) {
   const widths = headers.map(h => String(h).length);
   for (const row of rows) {

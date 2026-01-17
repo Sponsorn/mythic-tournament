@@ -58,6 +58,16 @@
       width: 3px;
       background: rgba(255, 255, 255, 0.9);
       border-radius: 2px;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .boss-marker:hover {
+      background: #fff;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+    }
+    .boss-marker:hover .boss-tooltip {
+      opacity: 1;
+      visibility: visible;
     }
     .boss-label {
       position: absolute;
@@ -67,6 +77,25 @@
       color: var(--text-secondary);
       transform: translateX(-50%);
       white-space: nowrap;
+    }
+    .boss-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s ease;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 
     .time-text {
@@ -84,8 +113,10 @@
       width: 32px;
       font-weight: 600;
     }
-    .upgrade-col.active { color: var(--accent-green); }
     .upgrade-col.inactive { color: var(--border-color); }
+    .upgrade-col.one-star { color: #1eff00; }      /* green */
+    .upgrade-col.two-star { color: #a335ee; }      /* purple */
+    .upgrade-col.three-star { color: #ff8000; }    /* orange */
 
     .level-cell {
       font-family: var(--font-mono);
@@ -326,9 +357,9 @@
                   <th style="width: 60px;">Level</th>
                   <th style="width: 180px;">Team</th>
                   <th>Time</th>
-                  <th style="width: 32px;" class="upgrade-col" title="+3 upgrade">★★★</th>
-                  <th style="width: 32px;" class="upgrade-col" title="+2 upgrade">★★</th>
-                  <th style="width: 32px;" class="upgrade-col" title="+1 upgrade">★</th>
+                  <th style="width: 32px;" class="upgrade-col one-star" title="+1 upgrade">★</th>
+                  <th style="width: 32px;" class="upgrade-col two-star" title="+2 upgrade">★★</th>
+                  <th style="width: 32px;" class="upgrade-col three-star" title="+3 upgrade">★★★</th>
                   <th style="width: 50px;">Pts</th>
                   <th style="width: 50px;">Deaths</th>
                 </tr>
@@ -348,9 +379,9 @@
               <td class="level-cell">+${run.level}</td>
               <td class="team-name-cell">${escapeHtml(run.team)}</td>
               <td>${timeBar}</td>
-              <td class="upgrade-col ${run.upgrades >= 3 ? 'active' : 'inactive'}">${run.upgrades >= 3 ? '★' : '☆'}</td>
-              <td class="upgrade-col ${run.upgrades >= 2 ? 'active' : 'inactive'}">${run.upgrades >= 2 ? '★' : '☆'}</td>
-              <td class="upgrade-col ${run.upgrades >= 1 ? 'active' : 'inactive'}">${run.upgrades >= 1 ? '★' : '☆'}</td>
+              <td class="upgrade-col ${run.upgrades >= 1 ? 'one-star' : 'inactive'}">${run.upgrades >= 1 ? '★' : '☆'}</td>
+              <td class="upgrade-col ${run.upgrades >= 2 ? 'two-star' : 'inactive'}">${run.upgrades >= 2 ? '★' : '☆'}</td>
+              <td class="upgrade-col ${run.upgrades >= 3 ? 'three-star' : 'inactive'}">${run.upgrades >= 3 ? '★' : '☆'}</td>
               <td class="points-cell">${run.points}</td>
               <td class="deaths-cell ${run.deaths === 0 ? 'zero' : ''}">${run.deaths || 0}</td>
             </tr>
@@ -402,8 +433,9 @@
           if (bossPercentage <= 110) {
             const bossTime = formatDuration(killMs);
             bossMarkersHtml += `
-              <div class="boss-marker" style="left: ${bossPercentage}%;" title="B${idx + 1}: ${bossTime}">
+              <div class="boss-marker" style="left: ${bossPercentage}%;">
                 <span class="boss-label">B${idx + 1}</span>
+                <span class="boss-tooltip">Boss ${idx + 1}: ${bossTime}</span>
               </div>
             `;
           }

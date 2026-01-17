@@ -109,43 +109,78 @@ async function wclFetchReportMplusFights(code) {
  * @returns {Promise<number[]>} Array of boss kill times in ms from fight start
  */
 async function wclFetchBossKillTimes(code, fightId, fightStartTime) {
-  // Query for encounter end events (boss kills) within this fight
-  const eventsQuery = `
-    query($code: String!, $fid: Int!) {
+  // For M+ dungeons, boss kills are tracked via dungeonPulls in the fight data
+  // We need to query the fight's dungeonPulls which contain boss encounter info
+  const query = `
+    query($code: String!, $fid: [Int!]) {
       reportData {
         report(code: $code) {
-          events(
-            dataType: Encounters,
-            fightIDs: [$fid],
-            limit: 100
-          ) { data }
+          fights(fightIDs: $fid) {
+            id
+            startTime
+            endTime
+            keystoneTime
+            dungeonPulls {
+              id
+              name
+              startTime
+              endTime
+              kill
+              encounterID
+            }
+          }
         }
       }
     }`;
 
   try {
-    const data = await wclGraphql(eventsQuery, { code, fid: Number(fightId) });
-    const events = data.reportData?.report?.events?.data || [];
+    const data = await wclGraphql(query, { code, fid: [Number(fightId)] });
+    const fights = data.reportData?.report?.fights || [];
+    const fight = fights[0];
 
-    // Filter for encounter end events (boss kills) and extract timestamps
+    console.log(`[WCL Boss] fightId=${fightId} fights=${fights.length} hasDungeonPulls=${!!fight?.dungeonPulls} pullCount=${fight?.dungeonPulls?.length || 0}`);
+
+    if (!fight || !fight.dungeonPulls) {
+      return [];
+    }
+
+    const fightStart = Number(fight.startTime || fightStartTime);
+    const fightEnd = Number(fight.endTime || 0);
+    const keystoneTime = Number(fight.keystoneTime || 0);
+    const wclDuration = fightEnd - fightStart;
+
+    console.log(`[WCL Boss] fightStart=${fightStart} fightEnd=${fightEnd} wclDuration=${wclDuration} keystoneTime=${keystoneTime}`);
+
     const bossKills = [];
-    for (const event of events) {
-      // Encounter end events have type 'encounterend' or similar
-      // The timestamp is relative to the report start
-      if (event.type === 'encounterend' || event.kill === true) {
-        // Convert to time from fight start
-        const killTimeFromFightStart = Number(event.timestamp) - Number(fightStartTime);
-        if (killTimeFromFightStart > 0) {
-          bossKills.push(killTimeFromFightStart);
+
+    for (const pull of fight.dungeonPulls) {
+      // Only include boss kills (encounterID > 0 indicates a boss encounter)
+      // pull.kill indicates if the boss was killed
+      if (pull.kill && pull.encounterID && pull.encounterID > 0) {
+        // endTime is relative to report start, convert to time from fight start
+        const killTimeFromFightStart = Number(pull.endTime) - fightStart;
+
+        // If we have keystoneTime, scale the boss kill time to match the keystone timer
+        // The WCL duration may differ from keystoneTime due to loading screens, countdown, etc.
+        let scaledKillTime = killTimeFromFightStart;
+        if (keystoneTime > 0 && wclDuration > 0) {
+          // Scale proportionally: (killTime / wclDuration) * keystoneTime
+          scaledKillTime = Math.round((killTimeFromFightStart / wclDuration) * keystoneTime);
+        }
+
+        console.log(`[WCL Boss] Boss kill: ${pull.name} encounterID=${pull.encounterID} rawTime=${killTimeFromFightStart} scaledTime=${scaledKillTime}`);
+        if (scaledKillTime > 0) {
+          bossKills.push(scaledKillTime);
         }
       }
     }
 
+    console.log(`[WCL Boss] Found ${bossKills.length} boss kills: ${JSON.stringify(bossKills)}`);
     // Sort by time
     bossKills.sort((a, b) => a - b);
     return bossKills;
   } catch (err) {
-    // If encounter events query fails, try getting phases from the fight
+    console.error('[WCL] Failed to fetch boss kill times:', err.message || err);
     return [];
   }
 }

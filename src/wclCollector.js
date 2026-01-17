@@ -1,6 +1,7 @@
 const {
   wclExtractCode,
   wclFetchReportMplusFights,
+  wclFetchBossKillTimes,
   wclCountDeathsForFight,
   makeAbsMs,
 } = require('./wclApi');
@@ -131,6 +132,14 @@ async function collectRunsAndSync() {
           deaths = 0;
         }
 
+        // Fetch boss kill times
+        let bossKills = [];
+        try {
+          bossKills = await wclFetchBossKillTimes(code, fight.id, fight.startTime || 0);
+        } catch (err) {
+          bossKills = [];
+        }
+
         let adjustedClearMs;
         const keystoneTime = Number(fight.keystoneTime || 0);
         if (keystoneTime > 0) {
@@ -178,6 +187,7 @@ async function collectRunsAndSync() {
           points,
           deaths: Number(deaths || 0),
           duration_ms: adjustedClearMs,
+          boss_kills: JSON.stringify(bossKills),
           character: '',
           realm: '',
           region: '',

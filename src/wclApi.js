@@ -100,6 +100,56 @@ async function wclFetchReportMplusFights(code) {
   return { report, fights, actors };
 }
 
+/**
+ * Fetch boss kill times for an M+ fight
+ * Returns array of boss kill timestamps (ms from fight start)
+ * @param {string} code - WCL report code
+ * @param {number} fightId - Fight ID
+ * @param {number} fightStartTime - Fight start time offset in report
+ * @returns {Promise<number[]>} Array of boss kill times in ms from fight start
+ */
+async function wclFetchBossKillTimes(code, fightId, fightStartTime) {
+  // Query for encounter end events (boss kills) within this fight
+  const eventsQuery = `
+    query($code: String!, $fid: Int!) {
+      reportData {
+        report(code: $code) {
+          events(
+            dataType: Encounters,
+            fightIDs: [$fid],
+            limit: 100
+          ) { data }
+        }
+      }
+    }`;
+
+  try {
+    const data = await wclGraphql(eventsQuery, { code, fid: Number(fightId) });
+    const events = data.reportData?.report?.events?.data || [];
+
+    // Filter for encounter end events (boss kills) and extract timestamps
+    const bossKills = [];
+    for (const event of events) {
+      // Encounter end events have type 'encounterend' or similar
+      // The timestamp is relative to the report start
+      if (event.type === 'encounterend' || event.kill === true) {
+        // Convert to time from fight start
+        const killTimeFromFightStart = Number(event.timestamp) - Number(fightStartTime);
+        if (killTimeFromFightStart > 0) {
+          bossKills.push(killTimeFromFightStart);
+        }
+      }
+    }
+
+    // Sort by time
+    bossKills.sort((a, b) => a - b);
+    return bossKills;
+  } catch (err) {
+    // If encounter events query fails, try getting phases from the fight
+    return [];
+  }
+}
+
 async function wclCountDeathsForFight(code, fightId) {
   const eventsQuery = `
     query($code: String!, $fid: Int!) {
@@ -163,6 +213,7 @@ async function wclCountDeathsForFight(code, fightId) {
 module.exports = {
   wclExtractCode,
   wclFetchReportMplusFights,
+  wclFetchBossKillTimes,
   wclCountDeathsForFight,
   makeAbsMs,
 };

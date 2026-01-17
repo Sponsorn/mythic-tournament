@@ -11,11 +11,11 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      min-width: 180px;
+      flex: 1;
     }
     .time-bar {
       flex: 1;
-      height: 8px;
+      height: 24px;
       background: var(--bg-tertiary);
       border-radius: 4px;
       overflow: visible;
@@ -26,17 +26,17 @@
       border-radius: 4px;
       transition: width 0.3s ease;
     }
-    .time-bar-fill.three { background: var(--accent-green); }
-    .time-bar-fill.two { background: var(--accent-blue); }
-    .time-bar-fill.one { background: var(--accent-yellow); }
-    .time-bar-fill.depleted { background: var(--accent-red); }
+    .time-bar-fill.three { background: linear-gradient(90deg, #22c55e 0%, #4ade80 100%); }
+    .time-bar-fill.two { background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%); }
+    .time-bar-fill.one { background: linear-gradient(90deg, #eab308 0%, #facc15 100%); }
+    .time-bar-fill.depleted { background: linear-gradient(90deg, #ef4444 0%, #f87171 100%); }
 
     .time-bar-markers {
       position: absolute;
-      top: -2px;
+      top: 0;
       left: 0;
       right: 0;
-      bottom: -2px;
+      bottom: 0;
       pointer-events: none;
     }
     .time-bar-marker {
@@ -44,37 +44,105 @@
       top: 0;
       bottom: 0;
       width: 2px;
-      background: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.5);
     }
     .time-bar-marker.m60 { left: 60%; }
     .time-bar-marker.m80 { left: 80%; }
+    .time-bar-marker.m100 { left: 100%; background: rgba(255, 255, 255, 0.8); }
+
+    /* Boss markers on bar */
+    .boss-marker {
+      position: absolute;
+      top: -4px;
+      bottom: -4px;
+      width: 3px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 2px;
+    }
+    .boss-label {
+      position: absolute;
+      top: -18px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
 
     .time-text {
       font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--text-secondary);
-      min-width: 42px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      min-width: 50px;
       text-align: right;
     }
 
     .upgrade-col {
       text-align: center;
       font-family: var(--font-mono);
-      width: 36px;
+      width: 32px;
       font-weight: 600;
     }
     .upgrade-col.active { color: var(--accent-green); }
     .upgrade-col.inactive { color: var(--border-color); }
 
-    .level-group-header {
+    .level-cell {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--accent-yellow);
+    }
+
+    .rank-cell {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .rank-cell.first { color: #ffd700; }
+    .rank-cell.second { color: #c0c0c0; }
+    .rank-cell.third { color: #cd7f32; }
+
+    .teams-table tbody tr:hover {
       background: var(--bg-tertiary);
     }
-    .level-group-header td {
-      padding: var(--spacing-sm) var(--spacing-md);
+
+    .dungeon-section {
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .section-title {
+      font-size: 18px;
       font-weight: 600;
       color: var(--text-primary);
-      font-size: 13px;
+      margin-bottom: var(--spacing-md);
+      padding-bottom: var(--spacing-sm);
+      border-bottom: 1px solid var(--border-color);
     }
+
+    .deaths-cell {
+      font-family: var(--font-mono);
+      color: var(--accent-red);
+    }
+    .deaths-cell.zero { color: var(--text-secondary); }
+
+    .points-cell {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--accent-green);
+    }
+
+    .upgrade-stars {
+      display: flex;
+      gap: 2px;
+      justify-content: center;
+    }
+    .star {
+      width: 12px;
+      height: 12px;
+    }
+    .star.filled { color: #ffd700; }
+    .star.empty { color: var(--border-color); }
   </style>
 </head>
 <body>
@@ -82,7 +150,7 @@
     <header class="admin-header">
       <div>
         <h1 class="admin-title">Best Times by Dungeon</h1>
-        <p class="admin-subtitle">Best run per team, sorted by key level</p>
+        <p class="admin-subtitle">Best run per team, ranked by key level then time</p>
       </div>
       <div class="connection-badge" id="connectionBadge">
         <span class="status-dot"></span>
@@ -205,7 +273,7 @@
     }
 
     function getBestRunPerTeam(runs) {
-      // Get best run per team (highest points, then fastest time)
+      // Get best run per team (highest level wins, then fastest time)
       const teamBest = {};
       for (const run of runs) {
         const team = run.team;
@@ -213,9 +281,9 @@
           teamBest[team] = run;
         } else {
           const current = teamBest[team];
-          // Better if more points, or same points but faster
-          if (run.points > current.points ||
-              (run.points === current.points && run.duration_ms < current.duration_ms)) {
+          // Higher level always wins, then faster time
+          if (run.level > current.level ||
+              (run.level === current.level && run.duration_ms < current.duration_ms)) {
             teamBest[team] = run;
           }
         }
@@ -240,20 +308,11 @@
         // Get best run per team
         const teamBestRuns = getBestRunPerTeam(allRuns);
 
-        // Sort by level desc, then points desc, then duration asc
+        // Sort by level desc, then duration asc (continuous ranking)
         teamBestRuns.sort((a, b) => {
           if (b.level !== a.level) return b.level - a.level;
-          if (b.points !== a.points) return b.points - a.points;
           return (a.duration_ms || 0) - (b.duration_ms || 0);
         });
-
-        // Group by key level
-        const byLevel = {};
-        for (const run of teamBestRuns) {
-          const lvl = run.level;
-          if (!byLevel[lvl]) byLevel[lvl] = [];
-          byLevel[lvl].push(run);
-        }
 
         const parTime = getParTime(dungeon);
 
@@ -263,45 +322,40 @@
             <table class="teams-table">
               <thead>
                 <tr>
-                  <th style="width: 55px;">Level</th>
-                  <th style="width: 35px;">#</th>
-                  <th>Team Name</th>
-                  <th style="width: 200px;">Time</th>
-                  <th style="width: 36px;" class="upgrade-col">+++</th>
-                  <th style="width: 36px;" class="upgrade-col">++</th>
-                  <th style="width: 36px;" class="upgrade-col">+</th>
-                  <th style="width: 55px;">Points</th>
-                  <th style="width: 55px;">Deaths</th>
+                  <th style="width: 40px;">#</th>
+                  <th style="width: 60px;">Level</th>
+                  <th style="width: 180px;">Team</th>
+                  <th>Time</th>
+                  <th style="width: 32px;" class="upgrade-col" title="+3 upgrade">★★★</th>
+                  <th style="width: 32px;" class="upgrade-col" title="+2 upgrade">★★</th>
+                  <th style="width: 32px;" class="upgrade-col" title="+1 upgrade">★</th>
+                  <th style="width: 50px;">Pts</th>
+                  <th style="width: 50px;">Deaths</th>
                 </tr>
               </thead>
               <tbody>
         `;
 
-        // Render levels from highest to lowest
-        const levels = Object.keys(byLevel).map(Number).sort((a, b) => b - a);
+        // Render all runs with continuous ranking
+        teamBestRuns.forEach((run, index) => {
+          const rank = index + 1;
+          const timeBar = renderTimeBar(run.duration_ms, parTime, run.upgrades, run.boss_kills);
+          const rankClass = rank === 1 ? 'first' : rank === 2 ? 'second' : rank === 3 ? 'third' : '';
 
-        for (const level of levels) {
-          const runsAtLevel = byLevel[level];
-
-          runsAtLevel.forEach((run, index) => {
-            const timeBar = renderTimeBar(run.duration_ms, parTime, run.upgrades);
-            const isFirst = index === 0;
-
-            html += `
-              <tr class="${isFirst ? 'best-run' : ''}">
-                <td class="level-cell" style="font-weight: 600;">+${run.level}</td>
-                <td class="rank-cell">${index + 1}</td>
-                <td class="team-name-cell">${escapeHtml(run.team)}</td>
-                <td>${timeBar}</td>
-                <td class="upgrade-col ${run.upgrades >= 3 ? 'active' : 'inactive'}">${run.upgrades >= 3 ? '+' : '-'}</td>
-                <td class="upgrade-col ${run.upgrades >= 2 ? 'active' : 'inactive'}">${run.upgrades >= 2 ? '+' : '-'}</td>
-                <td class="upgrade-col ${run.upgrades >= 1 ? 'active' : 'inactive'}">${run.upgrades >= 1 ? '+' : '-'}</td>
-                <td class="points-cell">${run.points}</td>
-                <td class="deaths-cell">${run.deaths || 0}</td>
-              </tr>
-            `;
-          });
-        }
+          html += `
+            <tr>
+              <td class="rank-cell ${rankClass}">${rank}</td>
+              <td class="level-cell">+${run.level}</td>
+              <td class="team-name-cell">${escapeHtml(run.team)}</td>
+              <td>${timeBar}</td>
+              <td class="upgrade-col ${run.upgrades >= 3 ? 'active' : 'inactive'}">${run.upgrades >= 3 ? '★' : '☆'}</td>
+              <td class="upgrade-col ${run.upgrades >= 2 ? 'active' : 'inactive'}">${run.upgrades >= 2 ? '★' : '☆'}</td>
+              <td class="upgrade-col ${run.upgrades >= 1 ? 'active' : 'inactive'}">${run.upgrades >= 1 ? '★' : '☆'}</td>
+              <td class="points-cell">${run.points}</td>
+              <td class="deaths-cell ${run.deaths === 0 ? 'zero' : ''}">${run.deaths || 0}</td>
+            </tr>
+          `;
+        });
 
         html += `
               </tbody>
@@ -317,7 +371,7 @@
     dungeonFilter.addEventListener('change', loadBestTimes);
 
     // Utility functions
-    function renderTimeBar(durationMs, parTime, upgrades) {
+    function renderTimeBar(durationMs, parTime, upgrades, bossKills) {
       if (!durationMs || durationMs <= 0 || !parTime) {
         return `<div class="time-bar-container">
           <div class="time-bar"><div class="time-bar-fill depleted" style="width: 100%;"></div></div>
@@ -340,11 +394,29 @@
 
       const timeStr = formatDuration(durationMs);
 
+      // Build boss markers HTML if we have boss kill data
+      let bossMarkersHtml = '';
+      if (bossKills && Array.isArray(bossKills) && bossKills.length > 0) {
+        bossKills.forEach((killMs, idx) => {
+          const bossPercentage = (killMs / parTime) * 100;
+          if (bossPercentage <= 110) {
+            const bossTime = formatDuration(killMs);
+            bossMarkersHtml += `
+              <div class="boss-marker" style="left: ${bossPercentage}%;" title="B${idx + 1}: ${bossTime}">
+                <span class="boss-label">B${idx + 1}</span>
+              </div>
+            `;
+          }
+        });
+      }
+
       return `<div class="time-bar-container">
         <div class="time-bar">
           <div class="time-bar-markers">
             <div class="time-bar-marker m60" title="+3 threshold (60%)"></div>
             <div class="time-bar-marker m80" title="+2 threshold (80%)"></div>
+            <div class="time-bar-marker m100" title="Par time (100%)"></div>
+            ${bossMarkersHtml}
           </div>
           <div class="time-bar-fill ${colorClass}" style="width: ${displayPercentage}%;"></div>
         </div>

@@ -23,6 +23,7 @@ const SCORE_HEADER = [
   'points',
   'deaths',
   'duration_ms',
+  'boss_kills',
   'character',
   'realm',
   'region',
@@ -333,6 +334,12 @@ function readScoresAsObjects() {
     obj.points = parseInt(obj.points, 10) || 0;
     obj.deaths = parseInt(obj.deaths, 10) || 0;
     obj.duration_ms = parseInt(obj.duration_ms, 10) || 0;
+    // Parse boss_kills as JSON array (e.g., "[120000,300000,450000]")
+    try {
+      obj.boss_kills = obj.boss_kills ? JSON.parse(obj.boss_kills) : [];
+    } catch (err) {
+      obj.boss_kills = [];
+    }
     return obj;
   });
 }
@@ -351,10 +358,11 @@ function getBestRunsPerDungeon(dungeonFilter = null) {
     dungeons[run.dungeon].push(run);
   }
 
-  // Sort each dungeon's runs by points desc, then by duration asc
+  // Sort each dungeon's runs by level desc, then by duration asc
+  // Higher key level is always better (more points), then faster time wins
   for (const dungeon of Object.keys(dungeons)) {
     dungeons[dungeon].sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
+      if (b.level !== a.level) return b.level - a.level;
       return a.duration_ms - b.duration_ms;
     });
   }

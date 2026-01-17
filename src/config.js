@@ -37,13 +37,6 @@ function getStringEnv(key, defaultValue = '') {
   return process.env[key] || defaultValue;
 }
 
-// Discord Configuration
-const DISCORD_TOKEN = getStringEnv('DISCORD_TOKEN');
-const CLIENT_ID = getStringEnv('CLIENT_ID');
-const GUILD_ID = getStringEnv('GUILD_ID');
-const ANNOUNCE_CHANNEL_ID = getStringEnv('ANNOUNCE_CHANNEL_ID');
-const COMMANDS_CHANNEL_ID = getStringEnv('COMMANDS_CHANNEL_ID');
-
 // Warcraft Logs Configuration
 const WCL_CLIENT_ID = getStringEnv('WCL_CLIENT_ID');
 const WCL_CLIENT_SECRET = getStringEnv('WCL_CLIENT_SECRET');
@@ -80,30 +73,9 @@ const MPLUS_START_OFFSET_MS = 10 * 1000; // 10 seconds - standard M+ start delay
  * Validates required configuration on startup
  */
 function validateConfig() {
-  const required = {
-    DISCORD_TOKEN,
-    CLIENT_ID,
-    GUILD_ID,
-  };
-
-  const missing = Object.entries(required)
-    .filter(([, value]) => !value)
-    .map(([key]) => key);
-
-  if (missing.length > 0) {
-    throw new Error(
-      `Missing required environment variables: ${missing.join(', ')}\n` +
-      'Please check your .env file against .env.example'
-    );
-  }
-
   // Warn about optional but recommended settings
   if (!WCL_CLIENT_ID || !WCL_CLIENT_SECRET) {
-    console.warn('Warning: WCL_CLIENT_ID and WCL_CLIENT_SECRET not set. WCL features will be disabled.');
-  }
-
-  if (WCL_CLIENT_ID && WCL_CLIENT_SECRET && !ANNOUNCE_CHANNEL_ID) {
-    console.warn('Warning: WCL credentials set but ANNOUNCE_CHANNEL_ID not configured.');
+    console.warn('Warning: WCL_CLIENT_ID and WCL_CLIENT_SECRET not set. WCL polling will be disabled.');
   }
 }
 
@@ -115,13 +87,6 @@ function hasWclCredentials() {
 }
 
 module.exports = {
-  // Discord
-  DISCORD_TOKEN,
-  CLIENT_ID,
-  GUILD_ID,
-  ANNOUNCE_CHANNEL_ID,
-  COMMANDS_CHANNEL_ID,
-
   // Warcraft Logs
   WCL_CLIENT_ID,
   WCL_CLIENT_SECRET,

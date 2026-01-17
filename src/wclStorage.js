@@ -31,12 +31,14 @@ const SCORE_HEADER = [
 let cache = null;
 
 function ensureTeamDefaults(team) {
+  const bracket = String(team?.bracket || 'A').toUpperCase();
   return {
     team_name: team?.team_name || '',
     leader_name: team?.leader_name || '',
     wcl_url: team?.wcl_url || '',
     wcl_backup_url: team?.wcl_backup_url || '',
     team_number: Number.isFinite(Number(team?.team_number)) ? Number(team.team_number) : null,
+    bracket: ['A', 'B', 'C'].includes(bracket) ? bracket : 'A',
   };
 }
 
@@ -127,7 +129,7 @@ function upsertTeam({ teamName, leaderName, wclUrl, wclBackupUrl }) {
   return { status: 'created', team };
 }
 
-function updateTeam({ teamName, teamNumber, leaderName, wclUrl, wclBackupUrl }) {
+function updateTeam({ teamName, teamNumber, leaderName, wclUrl, wclBackupUrl, bracket }) {
   const data = loadData();
   let target = null;
   if (Number.isFinite(Number(teamNumber))) {
@@ -142,6 +144,10 @@ function updateTeam({ teamName, teamNumber, leaderName, wclUrl, wclBackupUrl }) 
   target.leader_name = leaderName ?? target.leader_name;
   target.wcl_url = wclUrl ?? target.wcl_url;
   target.wcl_backup_url = wclBackupUrl ?? target.wcl_backup_url;
+  if (bracket !== undefined) {
+    const bracketUpper = String(bracket || 'A').toUpperCase();
+    target.bracket = ['A', 'B', 'C'].includes(bracketUpper) ? bracketUpper : target.bracket;
+  }
   saveData();
   return { status: 'updated', team: target };
 }

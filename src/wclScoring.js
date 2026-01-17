@@ -9,18 +9,51 @@ const DUNGEON_PAR_MS = {
   'tazavesh-soleahs-gambit': 1800000, // 30:00
 };
 
-const POINTS_MAP = {
+// Bracket-based scoring tables
+// Keys are key levels, values are { 1: points, 2: points, 3: points } for +1/+2/+3 upgrades
+const BRACKET_A = {
   10: { 1: 1, 2: 2, 3: 3 },
-  11: { 1: 3, 2: 4, 3: 5 },
-  12: { 1: 5, 2: 6, 3: 7 },
-  13: { 1: 7, 2: 9, 3: 10 },
-  14: { 1: 9, 2: 11, 3: 12 },
-  15: { 1: 12, 2: 14, 3: 15 },
-  16: { 1: 15, 2: 17, 3: 19 },
-  17: { 1: 18, 2: 20, 3: 22 },
-  18: { 1: 21, 2: 23, 3: 26 },
-  19: { 1: 24, 2: 27, 3: 30 },
-  20: { 1: 28, 2: 31, 3: 35 },
+  11: { 1: 2, 2: 3, 3: 4 },
+  12: { 1: 8, 2: 9, 3: 10 },
+  13: { 1: 11, 2: 12, 3: 13 },
+  14: { 1: 14, 2: 15, 3: 16 },
+  15: { 1: 20, 2: 21, 3: 22 },
+  16: { 1: 23, 2: 24, 3: 25 },
+  // 17+ not defined yet
+};
+
+const BRACKET_B = {
+  10: { 1: 0, 2: 0, 3: 0 },
+  11: { 1: 0, 2: 1, 3: 2 },
+  12: { 1: 1, 2: 2, 3: 3 },
+  13: { 1: 2, 2: 3, 3: 4 },
+  14: { 1: 8, 2: 9, 3: 10 },
+  15: { 1: 11, 2: 12, 3: 13 },
+  16: { 1: 14, 2: 15, 3: 16 },
+  17: { 1: 20, 2: 21, 3: 22 },
+  18: { 1: 23, 2: 24, 3: 25 },
+  // 19+ not defined yet
+};
+
+const BRACKET_C = {
+  10: { 1: 0, 2: 0, 3: 0 },
+  11: { 1: 0, 2: 0, 3: 0 },
+  12: { 1: 0, 2: 0, 3: 0 },
+  13: { 1: 0, 2: 0, 3: 1 },
+  14: { 1: 2, 2: 3, 3: 4 },
+  15: { 1: 5, 2: 6, 3: 7 },
+  16: { 1: 8, 2: 9, 3: 10 },
+  17: { 1: 14, 2: 15, 3: 16 },
+  18: { 1: 17, 2: 18, 3: 19 },
+  19: { 1: 26, 2: 28, 3: 30 },
+  20: { 1: 32, 2: 34, 3: 36 },
+  // 21+ not defined yet
+};
+
+const BRACKETS = {
+  A: BRACKET_A,
+  B: BRACKET_B,
+  C: BRACKET_C,
 };
 
 const EPS_MS = 500;
@@ -53,12 +86,36 @@ function calcUpgradesFromPar(dungeonName, clearMs) {
   return { inTime: true, upgrades: 1 };
 }
 
-function pointsFor(level, upgrades, inTime) {
+/**
+ * Calculate points for a run based on bracket, level, and upgrades
+ * @param {number} level - Keystone level
+ * @param {number} upgrades - Number of upgrades (1, 2, or 3)
+ * @param {boolean} inTime - Whether the run was completed in time
+ * @param {string} bracket - Team bracket ('A', 'B', or 'C'), defaults to 'A'
+ * @returns {number} Points earned
+ */
+function pointsFor(level, upgrades, inTime, bracket = 'A') {
   if (!inTime) return 0;
-  return Number(POINTS_MAP[Number(level)]?.[Number(upgrades)] || 0);
+
+  const bracketTable = BRACKETS[String(bracket).toUpperCase()] || BRACKET_A;
+  const levelPoints = bracketTable[Number(level)];
+
+  if (!levelPoints) return 0;
+  return Number(levelPoints[Number(upgrades)] || 0);
+}
+
+/**
+ * Get valid bracket values
+ * @returns {string[]} Array of valid bracket letters
+ */
+function getValidBrackets() {
+  return Object.keys(BRACKETS);
 }
 
 module.exports = {
   calcUpgradesFromPar,
   pointsFor,
+  getValidBrackets,
+  BRACKETS,
+  DUNGEON_PAR_MS,
 };

@@ -140,8 +140,8 @@ class TournamentClient {
     this.socket.emit('admin:setReportCode', { teamName, reportCode, backupCode });
   }
 
-  updateTeam(originalName, newTeamName, leaderName, reportCode, backupCode = null) {
-    this.socket.emit('admin:updateTeam', { originalName, newTeamName, leaderName, reportCode, backupCode });
+  updateTeam(originalName, newTeamName, leaderName, reportCode, backupCode = null, bracket = null) {
+    this.socket.emit('admin:updateTeam', { originalName, newTeamName, leaderName, reportCode, backupCode, bracket });
   }
 
   forceRefresh(teamName) {

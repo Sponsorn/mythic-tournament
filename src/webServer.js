@@ -5,6 +5,7 @@ const path = require('path');
 const stateManager = require('./stateManager');
 const { updateTeam, upsertTeam, findTeam, renameTeamInLeaderboard, saveTeams, getTeams, getBestRunsPerDungeon, getAllDungeonNames } = require('./wclStorage');
 const { wclExtractCode } = require('./wclApi');
+const { DUNGEON_PAR_MS } = require('./wclScoring');
 
 let io = null;
 let server = null;
@@ -60,6 +61,10 @@ function createWebServer(config = {}) {
     res.json(getBestRunsPerDungeon(dungeon));
   });
 
+  app.get('/api/dungeon-pars', (req, res) => {
+    res.json(DUNGEON_PAR_MS);
+  });
+
   // Health check
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', time: Date.now() });
@@ -95,9 +100,9 @@ function createWebServer(config = {}) {
       }
     });
 
-    // Admin: Update team (name, leader, report codes)
+    // Admin: Update team (name, leader, report codes, bracket)
     socket.on('admin:updateTeam', async (data) => {
-      const { originalName, newTeamName, leaderName, reportCode, backupCode } = data;
+      const { originalName, newTeamName, leaderName, reportCode, backupCode, bracket } = data;
 
       const code = wclExtractCode(reportCode);
       const backup = backupCode ? wclExtractCode(backupCode) : null;
@@ -114,6 +119,7 @@ function createWebServer(config = {}) {
         leaderName: leaderName || existingTeam.leader_name,
         wclUrl: code ? `https://www.warcraftlogs.com/reports/${code}` : '',
         wclBackupUrl: backup ? `https://www.warcraftlogs.com/reports/${backup}` : undefined,
+        bracket: bracket,
       });
 
       // If team name changed, rename in leaderboard and update team record

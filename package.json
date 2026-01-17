@@ -1,18 +1,15 @@
 {
   "name": "mplus-tournament",
   "version": "2.0.0",
-  "description": "M+ Tournament scoreboard with Discord bot and OBS overlays",
+  "description": "M+ Tournament scoreboard with OBS overlays",
   "main": "src/main.js",
   "scripts": {
-    "start": "node src/main.js",
-    "start:legacy": "node src/index.js",
-    "deploy-commands": "node src/deploy-commands.js"
+    "start": "node src/main.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "discord.js": "^14.25.1",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "socket.io": "^4.8.3"

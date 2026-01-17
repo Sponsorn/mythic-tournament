@@ -155,7 +155,8 @@ async function collectRunsAndSync() {
         const blizzRating = Number.isFinite(fight.rating)
           ? Math.round(Number(fight.rating))
           : 0;
-        const points = pointsFor(lvl, upgrades, inTime);
+        const teamBracket = team.bracket || 'A';
+        const points = pointsFor(lvl, upgrades, inTime, teamBracket);
 
         const dtEnd = new Date(enAbs);
         updateWclMeta(teamName, dtEnd.toISOString());
@@ -176,6 +177,7 @@ async function collectRunsAndSync() {
           in_time: inTime ? 1 : 0,
           points,
           deaths: Number(deaths || 0),
+          duration_ms: adjustedClearMs,
           character: '',
           realm: '',
           region: '',

@@ -1,6 +1,6 @@
 # M+ Tournament Live Scoreboard
 
-Real-time Mythic+ tournament tracking system with OBS overlays. Combines a Discord bot with a web server for live scoreboard displays during streaming events.
+Real-time Mythic+ tournament tracking system with OBS overlays. Web server with live scoreboard displays during streaming events.
 
 ## Features
 
@@ -8,7 +8,7 @@ Real-time Mythic+ tournament tracking system with OBS overlays. Combines a Disco
 - **Active Runs Tracker** - Shows teams currently in dungeons with progress
 - **Run Recap Display** - Auto-triggered completion summaries with scores
 - **Admin Dashboard** - Web-based team management and tournament control
-- **Discord Integration** - Slash commands for team management and status
+- **Bracket System** - Teams assigned to skill brackets (A/B/C) with different point scales
 - **Warcraft Logs Integration** - Automatic run detection via WCL API polling
 
 ## Architecture
@@ -17,7 +17,7 @@ Real-time Mythic+ tournament tracking system with OBS overlays. Combines a Disco
 ┌─────────────────────────────────────────────────────────────┐
 │                    Server (Raspberry Pi 5)                  │
 │  ┌─────────────┐    ┌──────────────┐    ┌───────────────┐   │
-│  │ WCL Poller  │───▶│ State Manager │───▶│ WebSocket   │   │
+│  │ WCL Poller  │───▶│ State Manager │───▶│ WebSocket     │  │
 │  └─────────────┘    └──────────────┘    │ Server        │   │
 │                                         └───────┬───────┘   │
 │  ┌───────────────────────────────────────────────┴────────┐ │
@@ -40,7 +40,6 @@ Real-time Mythic+ tournament tracking system with OBS overlays. Combines a Disco
 
 ### Prerequisites
 - Node.js 18+
-- Discord bot token and application
 - Warcraft Logs API credentials (OAuth2)
 
 ### Installation
@@ -57,9 +56,6 @@ Real-time Mythic+ tournament tracking system with OBS overlays. Combines a Disco
    ```
 
    **Required:**
-   - `DISCORD_TOKEN` - Bot token
-   - `CLIENT_ID` - Discord application ID
-   - `GUILD_ID` - Target Discord server ID
    - `WCL_CLIENT_ID` - Warcraft Logs OAuth client ID
    - `WCL_CLIENT_SECRET` - Warcraft Logs OAuth secret
 
@@ -69,12 +65,7 @@ Real-time Mythic+ tournament tracking system with OBS overlays. Combines a Disco
    - `POLL_INTERVAL_ACTIVE_MS` - Polling for active runs (default: 30000)
    - `POLL_INTERVAL_IDLE_MS` - Polling for idle teams (default: 300000)
 
-3. **Deploy Discord commands:**
-   ```bash
-   npm run deploy-commands
-   ```
-
-4. **Start the server:**
+3. **Start the server:**
    ```bash
    npm start
    ```
@@ -96,26 +87,42 @@ All overlays have transparent backgrounds for easy compositing.
 Access at `http://SERVER_IP:3000/admin/`
 
 Features:
-- View all teams with status and scores
-- Edit team names, leaders, and WCL report codes
+- View all teams with status, bracket, and scores
+- Edit team names, leaders, brackets, and WCL report codes
 - Force refresh individual teams
 - Pause/resume tournament polling
 - Trigger run recaps manually
+- View best times per dungeon
 
+## Bracket Scoring System
+
+Teams are assigned to brackets (A, B, or C) which determine point values per key level:
+
+| Key Level | Bracket A | Bracket B | Bracket C |
+|-----------|-----------|-----------|-----------|
+| 10        | 1-3 pts   | 0 pts     | 0 pts     |
+| 11        | 2-4 pts   | 0-2 pts   | 0 pts     |
+| 12        | 8-10 pts  | 1-3 pts   | 0 pts     |
+| 13        | 11-13 pts | 2-4 pts   | 0-1 pts   |
+| 14        | 14-16 pts | 8-10 pts  | 2-4 pts   |
+| 15        | 20-22 pts | 11-13 pts | 5-7 pts   |
+| 16        | 23-25 pts | 14-16 pts | 8-10 pts  |
+
+Points shown as +1/+2/+3 upgrade ranges. See `src/wclScoring.js` for complete tables.
 
 ## Project Structure
 
 ```
 src/
-├── main.js           # Entry point (Discord bot + web server)
+├── main.js           # Entry point (web server)
 ├── webServer.js      # Express + Socket.io server
 ├── stateManager.js   # Central state + event emitter
 ├── config.js         # Configuration & validation
 ├── wclApi.js         # WCL API client (OAuth2, GraphQL)
 ├── wclCollector.js   # WCL run detection & polling
-├── wclScoring.js     # M+ scoring logic
+├── wclScoring.js     # M+ bracket-based scoring logic
 ├── wclStorage.js     # Team & leaderboard persistence
-└── wclUtils.js       # WCL utilities
+└── timeUtils.js      # Time formatting utilities
 
 public/
 ├── css/              # Stylesheets
@@ -145,19 +152,10 @@ data/
 ### Client to Server (Admin)
 | Event | Description |
 |-------|-------------|
-| `admin:updateTeam` | Edit team details |
+| `admin:updateTeam` | Edit team details (including bracket) |
 | `admin:forceRefresh` | Force poll a team |
 | `admin:tournament` | Pause/resume polling |
 | `admin:showRecap` | Trigger recap display |
-
-## Scoring System
-
-Points are calculated based on:
-- Keystone level and upgrade status
-- Completion time vs par time
-- Death penalties (5s for keys <12, 15s for keys >=12)
-
-See `src/wclScoring.js` for detailed scoring logic.
 
 ## API Quota
 
@@ -171,7 +169,7 @@ Quota is displayed in the admin dashboard.
 
 ## Data Storage
 
-- `data/wcl.json` - Teams, leaderboard, seen runs
+- `data/wcl.json` - Teams (with brackets), leaderboard, seen runs
 - `data/wcl_scores.csv` - Historical run records
 
 **Backup recommendation:** Regular backups of the `data/` directory.

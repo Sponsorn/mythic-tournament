@@ -6,13 +6,83 @@
   <title>M+ Tournament - Best Times</title>
   <link rel="stylesheet" href="/css/common.css">
   <link rel="stylesheet" href="/css/admin.css">
+  <style>
+    .time-bar-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 180px;
+    }
+    .time-bar {
+      flex: 1;
+      height: 8px;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+      overflow: visible;
+      position: relative;
+    }
+    .time-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .time-bar-fill.three { background: var(--accent-green); }
+    .time-bar-fill.two { background: var(--accent-blue); }
+    .time-bar-fill.one { background: var(--accent-yellow); }
+    .time-bar-fill.depleted { background: var(--accent-red); }
+
+    .time-bar-markers {
+      position: absolute;
+      top: -2px;
+      left: 0;
+      right: 0;
+      bottom: -2px;
+      pointer-events: none;
+    }
+    .time-bar-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.4);
+    }
+    .time-bar-marker.m60 { left: 60%; }
+    .time-bar-marker.m80 { left: 80%; }
+
+    .time-text {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      min-width: 42px;
+      text-align: right;
+    }
+
+    .upgrade-col {
+      text-align: center;
+      font-family: var(--font-mono);
+      width: 36px;
+      font-weight: 600;
+    }
+    .upgrade-col.active { color: var(--accent-green); }
+    .upgrade-col.inactive { color: var(--border-color); }
+
+    .level-group-header {
+      background: var(--bg-tertiary);
+    }
+    .level-group-header td {
+      padding: var(--spacing-sm) var(--spacing-md);
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+  </style>
 </head>
 <body>
   <div class="admin-container">
     <header class="admin-header">
       <div>
         <h1 class="admin-title">Best Times by Dungeon</h1>
-        <p class="admin-subtitle">View top runs per dungeon, sorted by points</p>
+        <p class="admin-subtitle">Best run per team, sorted by key level</p>
       </div>
       <div class="connection-badge" id="connectionBadge">
         <span class="status-dot"></span>
@@ -59,6 +129,7 @@
     // State
     let dungeons = [];
     let bestTimes = {};
+    let dungeonPars = {};
 
     // Connection events
     client.on('connected', () => {
@@ -81,6 +152,10 @@
         const dungeonRes = await fetch('/api/dungeons');
         dungeons = await dungeonRes.json();
         populateDungeonFilter();
+
+        // Load dungeon par times
+        const parsRes = await fetch('/api/dungeon-pars');
+        dungeonPars = await parsRes.json();
 
         // Load best times
         await loadBestTimes();
@@ -113,6 +188,41 @@
       }
     }
 
+    function slugifyDungeon(name) {
+      return String(name || '')
+        .toLowerCase()
+        .trim()
+        .replace(/['`]/g, "'")
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+
+    function getParTime(dungeonName) {
+      const slug = slugifyDungeon(dungeonName);
+      return dungeonPars[slug] || null;
+    }
+
+    function getBestRunPerTeam(runs) {
+      // Get best run per team (highest points, then fastest time)
+      const teamBest = {};
+      for (const run of runs) {
+        const team = run.team;
+        if (!teamBest[team]) {
+          teamBest[team] = run;
+        } else {
+          const current = teamBest[team];
+          // Better if more points, or same points but faster
+          if (run.points > current.points ||
+              (run.points === current.points && run.duration_ms < current.duration_ms)) {
+            teamBest[team] = run;
+          }
+        }
+      }
+      return Object.values(teamBest);
+    }
+
     function renderBestTimes() {
       const dungeonNames = Object.keys(bestTimes).sort();
 
@@ -124,8 +234,28 @@
       let html = '';
 
       for (const dungeon of dungeonNames) {
-        const runs = bestTimes[dungeon];
-        if (!runs || runs.length === 0) continue;
+        const allRuns = bestTimes[dungeon];
+        if (!allRuns || allRuns.length === 0) continue;
+
+        // Get best run per team
+        const teamBestRuns = getBestRunPerTeam(allRuns);
+
+        // Sort by level desc, then points desc, then duration asc
+        teamBestRuns.sort((a, b) => {
+          if (b.level !== a.level) return b.level - a.level;
+          if (b.points !== a.points) return b.points - a.points;
+          return (a.duration_ms || 0) - (b.duration_ms || 0);
+        });
+
+        // Group by key level
+        const byLevel = {};
+        for (const run of teamBestRuns) {
+          const lvl = run.level;
+          if (!byLevel[lvl]) byLevel[lvl] = [];
+          byLevel[lvl].push(run);
+        }
+
+        const parTime = getParTime(dungeon);
 
         html += `
           <div class="dungeon-section">
@@ -133,34 +263,45 @@
             <table class="teams-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Team</th>
-                  <th>Level</th>
-                  <th>Upgrades</th>
-                  <th>Time</th>
-                  <th>Deaths</th>
-                  <th>Points</th>
-                  <th>Date</th>
+                  <th style="width: 55px;">Level</th>
+                  <th style="width: 35px;">#</th>
+                  <th>Team Name</th>
+                  <th style="width: 200px;">Time</th>
+                  <th style="width: 36px;" class="upgrade-col">+++</th>
+                  <th style="width: 36px;" class="upgrade-col">++</th>
+                  <th style="width: 36px;" class="upgrade-col">+</th>
+                  <th style="width: 55px;">Points</th>
+                  <th style="width: 55px;">Deaths</th>
                 </tr>
               </thead>
               <tbody>
         `;
 
-        runs.forEach((run, index) => {
-          const upgradeStars = getUpgradeStars(run.upgrades);
-          html += `
-            <tr class="${index === 0 ? 'best-run' : ''}">
-              <td class="rank-cell">${index + 1}</td>
-              <td class="team-name-cell">${escapeHtml(run.team)}</td>
-              <td class="level-cell">+${run.level}</td>
-              <td class="upgrades-cell">${upgradeStars}</td>
-              <td class="time-cell">${formatDuration(run.duration_ms)}</td>
-              <td class="deaths-cell">${run.deaths}</td>
-              <td class="points-cell">${run.points}</td>
-              <td class="date-cell">${formatDate(run.finished_at_realm)}</td>
-            </tr>
-          `;
-        });
+        // Render levels from highest to lowest
+        const levels = Object.keys(byLevel).map(Number).sort((a, b) => b - a);
+
+        for (const level of levels) {
+          const runsAtLevel = byLevel[level];
+
+          runsAtLevel.forEach((run, index) => {
+            const timeBar = renderTimeBar(run.duration_ms, parTime, run.upgrades);
+            const isFirst = index === 0;
+
+            html += `
+              <tr class="${isFirst ? 'best-run' : ''}">
+                <td class="level-cell" style="font-weight: 600;">+${run.level}</td>
+                <td class="rank-cell">${index + 1}</td>
+                <td class="team-name-cell">${escapeHtml(run.team)}</td>
+                <td>${timeBar}</td>
+                <td class="upgrade-col ${run.upgrades >= 3 ? 'active' : 'inactive'}">${run.upgrades >= 3 ? '+' : '-'}</td>
+                <td class="upgrade-col ${run.upgrades >= 2 ? 'active' : 'inactive'}">${run.upgrades >= 2 ? '+' : '-'}</td>
+                <td class="upgrade-col ${run.upgrades >= 1 ? 'active' : 'inactive'}">${run.upgrades >= 1 ? '+' : '-'}</td>
+                <td class="points-cell">${run.points}</td>
+                <td class="deaths-cell">${run.deaths || 0}</td>
+              </tr>
+            `;
+          });
+        }
 
         html += `
               </tbody>
@@ -176,11 +317,39 @@
     dungeonFilter.addEventListener('change', loadBestTimes);
 
     // Utility functions
-    function getUpgradeStars(upgrades) {
-      if (upgrades === 3) return '<span class="upgrade-stars three">+++</span>';
-      if (upgrades === 2) return '<span class="upgrade-stars two">++</span>';
-      if (upgrades === 1) return '<span class="upgrade-stars one">+</span>';
-      return '<span class="upgrade-stars zero">-</span>';
+    function renderTimeBar(durationMs, parTime, upgrades) {
+      if (!durationMs || durationMs <= 0 || !parTime) {
+        return `<div class="time-bar-container">
+          <div class="time-bar"><div class="time-bar-fill depleted" style="width: 100%;"></div></div>
+          <span class="time-text">--:--</span>
+        </div>`;
+      }
+
+      // Calculate percentage of par time used
+      // 60% = +3, 80% = +2, 100% = +1, >100% = depleted
+      const percentage = (durationMs / parTime) * 100;
+
+      // For display, cap at 110% so bar doesn't overflow too much
+      const displayPercentage = Math.min(percentage, 110);
+
+      // Determine color class based on upgrades
+      let colorClass = 'depleted';
+      if (upgrades >= 3) colorClass = 'three';
+      else if (upgrades >= 2) colorClass = 'two';
+      else if (upgrades >= 1) colorClass = 'one';
+
+      const timeStr = formatDuration(durationMs);
+
+      return `<div class="time-bar-container">
+        <div class="time-bar">
+          <div class="time-bar-markers">
+            <div class="time-bar-marker m60" title="+3 threshold (60%)"></div>
+            <div class="time-bar-marker m80" title="+2 threshold (80%)"></div>
+          </div>
+          <div class="time-bar-fill ${colorClass}" style="width: ${displayPercentage}%;"></div>
+        </div>
+        <span class="time-text">${timeStr}</span>
+      </div>`;
     }
 
     function formatDuration(ms) {
@@ -189,21 +358,6 @@
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;
       return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-
-    function formatDate(isoString) {
-      if (!isoString) return '-';
-      try {
-        const date = new Date(isoString);
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      } catch {
-        return '-';
-      }
     }
 
     function escapeHtml(text) {

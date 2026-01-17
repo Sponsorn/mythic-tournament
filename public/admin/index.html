@@ -66,6 +66,7 @@
           <tr>
             <th>#</th>
             <th>Team Name</th>
+            <th>Bracket</th>
             <th>Report Code</th>
             <th>Status</th>
             <th>Score</th>
@@ -74,7 +75,7 @@
         </thead>
         <tbody id="teamsBody">
           <tr>
-            <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading...</td>
+            <td colspan="7" style="text-align: center; color: var(--text-muted);">Loading...</td>
           </tr>
         </tbody>
       </table>
@@ -108,6 +109,14 @@
         <div class="form-group">
           <label class="form-label">Leader Name</label>
           <input type="text" class="input" id="editLeaderName" placeholder="Team leader name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bracket</label>
+          <select class="input" id="editBracket">
+            <option value="A">Bracket A</option>
+            <option value="B">Bracket B</option>
+            <option value="C">Bracket C</option>
+          </select>
         </div>
         <div class="form-group">
           <label class="form-label">Primary Report Code (URL or 16-char code)</label>
@@ -224,7 +233,7 @@
 
     function renderTeams() {
       if (!teams.length) {
-        teamsBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No teams registered</td></tr>';
+        teamsBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No teams registered</td></tr>';
         return;
       }
 
@@ -234,11 +243,13 @@
         const status = entry?.status || team.status || 'idle';
         const statusClass = status === 'running' ? 'running' : '';
         const code = extractCode(team.wclUrl);
+        const bracket = team.bracket || 'A';
 
         return `
           <tr data-team="${escapeHtml(team.name)}">
             <td class="team-number">${team.id || '-'}</td>
             <td class="team-name-cell">${escapeHtml(team.name)}</td>
+            <td class="team-bracket"><span class="bracket-badge bracket-${bracket.toLowerCase()}">${bracket}</span></td>
             <td class="team-code">${code || '<span style="color: var(--accent-yellow);">Not set</span>'}</td>
             <td class="team-status-cell">
               <span class="status-indicator ${statusClass}">
@@ -248,7 +259,7 @@
             </td>
             <td style="font-family: var(--font-mono);">${score.toLocaleString()}</td>
             <td class="team-actions">
-              <button class="btn btn-secondary btn-sm" onclick="editTeam('${escapeHtml(team.name)}', '${code || ''}')">Edit</button>
+              <button class="btn btn-secondary btn-sm" onclick="editTeam('${escapeHtml(team.name)}')">Edit</button>
               <button class="btn btn-primary btn-sm" onclick="refreshTeam('${escapeHtml(team.name)}')">Refresh</button>
             </td>
           </tr>
@@ -303,13 +314,16 @@
     });
 
     // Edit modal
-    function editTeam(teamName, currentCode) {
+    function editTeam(teamName) {
       const team = teams.find(t => t.name === teamName);
+      const code = extractCode(team?.wclUrl);
+      const backupCode = extractCode(team?.wclBackupUrl);
       document.getElementById('editOriginalName').value = teamName;
       document.getElementById('editTeamName').value = teamName;
       document.getElementById('editLeaderName').value = team?.leaderName || '';
-      document.getElementById('editReportCode').value = currentCode;
-      document.getElementById('editBackupCode').value = '';
+      document.getElementById('editBracket').value = team?.bracket || 'A';
+      document.getElementById('editReportCode').value = code || '';
+      document.getElementById('editBackupCode').value = backupCode || '';
       editModal.classList.add('visible');
     }
 
@@ -321,6 +335,7 @@
       const originalName = document.getElementById('editOriginalName').value;
       const newTeamName = document.getElementById('editTeamName').value.trim();
       const leaderName = document.getElementById('editLeaderName').value.trim();
+      const bracket = document.getElementById('editBracket').value;
       const reportCode = document.getElementById('editReportCode').value;
       const backupCode = document.getElementById('editBackupCode').value;
 
@@ -329,7 +344,7 @@
         return;
       }
 
-      client.updateTeam(originalName, newTeamName, leaderName, reportCode, backupCode || null);
+      client.updateTeam(originalName, newTeamName, leaderName, reportCode, backupCode || null, bracket);
       editModal.classList.remove('visible');
     });
 

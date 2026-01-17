@@ -6,21 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm install           # Install dependencies
-npm start             # Start Discord bot + web server (src/main.js)
-npm run deploy-commands  # Deploy Discord slash commands to guild
+npm start             # Start web server (src/main.js)
 ```
 
 No test framework is configured. The project uses Node.js 18+ (requires native `fetch`).
 
 ## Architecture
 
-This is a World of Warcraft Mythic+ tournament tracking system with two main components:
+This is a World of Warcraft Mythic+ tournament tracking system with web-based OBS overlays.
 
-### Discord Bot + Web Server (src/main.js)
+### Web Server (src/main.js)
 Single entry point that initializes:
-1. **Discord.js client** - Handles /wcl slash commands for team management and status
-2. **Express + Socket.io server** - Serves OBS overlays and admin dashboard
-3. **Adaptive WCL poller** - Polls Warcraft Logs API (30s when runs active, 5min when idle)
+1. **Express + Socket.io server** - Serves OBS overlays and admin dashboard
+2. **Adaptive WCL poller** - Polls Warcraft Logs API (30s when runs active, 5min when idle)
 
 ### Data Flow
 ```
@@ -34,14 +32,23 @@ WCL API → wclCollector.js → wclStorage.js (JSON/CSV) → stateManager.js →
 | `stateManager.js` | Singleton EventEmitter holding tournament state (teams, leaderboard, active runs). Bridges between WCL polling and WebSocket broadcasts. |
 | `wclCollector.js` | Polls WCL GraphQL API for new runs, detects completions, calculates scores |
 | `wclStorage.js` | Persistence layer: `data/wcl.json` (teams/leaderboard), `data/wcl_scores.csv` (run history) |
-| `wclScoring.js` | Points calculation based on key level, upgrade count, par times |
+| `wclScoring.js` | Points calculation based on bracket, key level, and upgrade count |
 | `webServer.js` | Express routes + Socket.io events for real-time overlay updates |
 | `config.js` | Environment variable parsing with validation and defaults |
+
+### Bracket-Based Scoring
+
+Teams are assigned to brackets (A, B, or C) which determine point values:
+- **Bracket A** - Highest skill bracket, points start at key level 10
+- **Bracket B** - Mid-tier bracket, points start at key level 11
+- **Bracket C** - Entry bracket, meaningful points start at key level 14
+
+See `wclScoring.js` for the complete point tables per bracket.
 
 ### Frontend Structure
 
 - `/overlays/*.html` - OBS browser source overlays (scoreboard, active-runs, recap)
-- `/admin/*.html` - Web dashboard for team management
+- `/admin/*.html` - Web dashboard for team management (includes bracket editing)
 - `/js/socket-client.js` - TournamentClient class wrapping Socket.io
 
 ### WebSocket Event Pattern
@@ -50,13 +57,13 @@ Server emits `scoreboard:update`, `run:start`, `run:complete`, etc. Admin panel 
 
 ## Environment Variables
 
-Required: `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, `WCL_CLIENT_ID`, `WCL_CLIENT_SECRET`
+Required: `WCL_CLIENT_ID`, `WCL_CLIENT_SECRET`
 
 Web server defaults to port 3000 (`WEB_PORT`). Polling intervals controlled by `POLL_INTERVAL_ACTIVE_MS` (30s) and `POLL_INTERVAL_IDLE_MS` (5min).
 
 ## Data Storage
 
-- `data/wcl.json` - Teams array, `leaderboardWcl` object (team→points), `wclMeta` (run counts), `seenWcl` (deduplication)
+- `data/wcl.json` - Teams array (with bracket field), `leaderboardWcl` object (team→points), `wclMeta` (run counts), `seenWcl` (deduplication)
 - `data/wcl_scores.csv` - Historical run records with columns: team, dungeon, level, upgrades, points, duration_ms, etc.
 
 Team renames must update both the team record AND the `leaderboardWcl`/`wclMeta` keys (see `renameTeamInLeaderboard` function).

@@ -16,10 +16,10 @@ Real-time Mythic+ tournament tracking system with OBS overlays. Combines a Disco
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Server (Raspberry Pi 5)                  │
-│  ┌─────────────┐    ┌──────────────┐    ┌───────────────┐  │
-│  │ WCL Poller  │───▶│ State Manager │───▶│ WebSocket     │  │
-│  └─────────────┘    └──────────────┘    │ Server        │  │
-│                                          └───────┬───────┘  │
+│  ┌─────────────┐    ┌──────────────┐    ┌───────────────┐   │
+│  │ WCL Poller  │───▶│ State Manager │───▶│ WebSocket   │   │
+│  └─────────────┘    └──────────────┘    │ Server        │   │
+│                                         └───────┬───────┘   │
 │  ┌───────────────────────────────────────────────┴────────┐ │
 │  │              Express Web Server (:3000)                │ │
 │  │  /overlays/scoreboard.html                             │ │
@@ -32,7 +32,7 @@ Real-time Mythic+ tournament tracking system with OBS overlays. Combines a Disco
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    OBS (Streaming PC)                       │
-│  Browser Source: http://[SERVER_IP]:3000/overlays/...      │
+│  Browser Source: http://[SERVER_IP]:3000/overlays/...       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -102,16 +102,6 @@ Features:
 - Pause/resume tournament polling
 - Trigger run recaps manually
 
-## Discord Commands
-
-### Warcraft Logs
-- `/wcl scoreboard` - Show team standings
-- `/wcl teamruns [team_name] [limit]` - Show recent runs
-- `/wcl team` - Create or update a team
-- `/wcl teamedit [team_name] [team_number]` - Edit team details
-- `/wcl listteams` - List all teams
-- `/wcl reloadteams` - Reload teams from disk
-- `/wcl forcecheck` - Manually poll WCL for new runs
 
 ## Project Structure
 

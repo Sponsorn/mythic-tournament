@@ -3,9 +3,9 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const stateManager = require('./stateManager');
-const { updateTeam, upsertTeam, findTeam, renameTeamInLeaderboard, saveTeams, getTeams, getBestRunsPerDungeon, getAllDungeonNames } = require('./wclStorage');
+const { updateTeam, upsertTeam, findTeam, renameTeamInLeaderboard, saveTeams, getTeams, getBestRunsPerDungeon, getAllDungeonNames, readScoresAsObjects } = require('./wclStorage');
 const { wclExtractCode } = require('./wclApi');
-const { DUNGEON_PAR_MS } = require('./wclScoring');
+const { DUNGEON_PAR_MS, DUNGEON_SHORT_NAMES } = require('./wclScoring');
 
 let io = null;
 let server = null;
@@ -63,6 +63,49 @@ function createWebServer(config = {}) {
 
   app.get('/api/dungeon-pars', (req, res) => {
     res.json(DUNGEON_PAR_MS);
+  });
+
+  app.get('/api/dungeon-short-names', (req, res) => {
+    res.json(DUNGEON_SHORT_NAMES);
+  });
+
+  // Team stats (highest key, total deaths, unique dungeons per team)
+  app.get('/api/team-stats', (req, res) => {
+    const scores = readScoresAsObjects();
+    const stats = {};
+
+    for (const run of scores) {
+      const team = run.team;
+      if (!team) continue;
+
+      if (!stats[team]) {
+        stats[team] = {
+          highestKey: 0,
+          totalDeaths: 0,
+          dungeons: new Set(),
+        };
+      }
+
+      if (run.level > stats[team].highestKey) {
+        stats[team].highestKey = run.level;
+      }
+      stats[team].totalDeaths += run.deaths || 0;
+      if (run.dungeon) {
+        stats[team].dungeons.add(run.dungeon);
+      }
+    }
+
+    // Convert Sets to counts
+    const result = {};
+    for (const [team, data] of Object.entries(stats)) {
+      result[team] = {
+        highestKey: data.highestKey,
+        totalDeaths: data.totalDeaths,
+        uniqueDungeons: data.dungeons.size,
+      };
+    }
+
+    res.json(result);
   });
 
   // Health check
@@ -216,11 +259,16 @@ function createWebServer(config = {}) {
     io.emit('teams:update', teams);
   });
 
+  stateManager.on('poll:complete', (data) => {
+    io.emit('poll:complete', data);
+  });
+
   // Start server
   return new Promise((resolve, reject) => {
     server.listen(port, host, () => {
       console.log(`[WebServer] Running at http://${host}:${port}`);
       console.log(`[WebServer] Overlays available at:`);
+      console.log(`  - Stream Overlay (1920x300): http://${host}:${port}/overlays/stream-overlay.html`);
       console.log(`  - Scoreboard: http://${host}:${port}/overlays/scoreboard.html`);
       console.log(`  - Active Runs: http://${host}:${port}/overlays/active-runs.html`);
       console.log(`  - Recap: http://${host}:${port}/overlays/recap.html`);

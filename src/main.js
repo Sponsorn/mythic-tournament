@@ -63,6 +63,9 @@ function startAdaptivePolling() {
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = setTimeout(poll, interval);
 
+    // Notify clients of poll complete with next interval
+    stateManager.onPollComplete(interval);
+
     console.log(`[Main] Next poll in ${interval / 1000}s (active runs: ${hasActiveRuns})`);
   }
 
@@ -87,7 +90,6 @@ async function pollWclRuns() {
   // Update state manager
   stateManager.refreshTeams();
   stateManager.refreshLeaderboard();
-  stateManager.onPollComplete();
 
   // Process completed runs for state manager
   if (newCount > 0) {

@@ -177,6 +177,23 @@ body {
   background: var(--bg-hover);
 }
 
+/* Leaderboard Section */
+.leaderboard-section {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: var(--spacing-xl);
+  overflow: hidden;
+}
+
+.leaderboard-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 /* Teams Table */
 .teams-section {
   background: var(--bg-secondary);

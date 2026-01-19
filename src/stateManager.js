@@ -3,7 +3,7 @@ const {
   getTeams,
   readLeaderboardWcl,
   readWclMeta,
-  readScores,
+  readScoresAsObjects,
 } = require('./wclStorage');
 
 class StateManager extends EventEmitter {
@@ -25,6 +25,7 @@ class StateManager extends EventEmitter {
         resetTime: Date.now() + 3600000,
       },
       lastPollTime: null,
+      nextPollMs: null,
       serverTime: Date.now(),
     };
     this.quotaRequests = [];
@@ -57,10 +58,19 @@ class StateManager extends EventEmitter {
     const leaderboardData = readLeaderboardWcl();
     const meta = readWclMeta();
 
+    // Count actual runs from CSV (source of truth)
+    const scores = readScoresAsObjects();
+    const runCounts = {};
+    for (const run of scores) {
+      if (run.team) {
+        runCounts[run.team] = (runCounts[run.team] || 0) + 1;
+      }
+    }
+
     const entries = Object.entries(leaderboardData).map(([teamName, points]) => ({
       teamName,
       points: points || 0,
-      runs: meta[teamName]?.runs || 0,
+      runs: runCounts[teamName] || 0,
       lastRun: meta[teamName]?.last || null,
     }));
 
@@ -260,9 +270,13 @@ class StateManager extends EventEmitter {
   }
 
   // Update poll time
-  onPollComplete() {
+  onPollComplete(nextPollMs = 30000) {
     this.state.lastPollTime = Date.now();
-    this.emit('poll:complete', { time: this.state.lastPollTime });
+    this.state.nextPollMs = nextPollMs;
+    this.emit('poll:complete', {
+      time: this.state.lastPollTime,
+      nextPollMs: nextPollMs
+    });
   }
 
   // Tournament control

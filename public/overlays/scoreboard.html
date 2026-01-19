@@ -77,7 +77,10 @@
         return;
       }
 
-      const html = leaderboard.map((entry, index) => {
+      // Limit to top 5 teams for overlay display
+      const displayLeaderboard = leaderboard.slice(0, 5);
+
+      const html = displayLeaderboard.map((entry, index) => {
         const prevRank = previousRanks[entry.teamName];
         let rankChangeClass = '';
         let rankChangeHtml = '';

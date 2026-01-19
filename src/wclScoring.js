@@ -9,6 +9,17 @@ const DUNGEON_PAR_MS = {
   'tazavesh-soleahs-gambit': 1800000, // 30:00
 };
 
+const DUNGEON_SHORT_NAMES = {
+  'eco-dome-aldani': 'EDA',
+  'ara-kara-city-of-echoes': 'ARA',
+  'the-dawnbreaker': 'DAWN',
+  'priory-of-the-sacred-flame': 'PSF',
+  'operation-floodgate': 'FLOOD',
+  'halls-of-atonement': 'HOA',
+  'tazavesh-streets-of-wonder': 'STRT',
+  'tazavesh-soleahs-gambit': 'GMBT',
+};
+
 // Bracket-based scoring tables
 // Keys are key levels, values are { 1: points, 2: points, 3: points } for +1/+2/+3 upgrades
 const BRACKET_A = {
@@ -119,10 +130,23 @@ function getValidBrackets() {
   return Object.keys(BRACKETS);
 }
 
+/**
+ * Get short name for a dungeon
+ * @param {string} dungeonName - Full dungeon name
+ * @returns {string} Short name or abbreviated original
+ */
+function getShortDungeonName(dungeonName) {
+  const slug = slugifyDungeon(dungeonName);
+  return DUNGEON_SHORT_NAMES[slug] || dungeonName.substring(0, 4).toUpperCase();
+}
+
 module.exports = {
   calcUpgradesFromPar,
   pointsFor,
   getValidBrackets,
+  getShortDungeonName,
+  slugifyDungeon,
   BRACKETS,
   DUNGEON_PAR_MS,
+  DUNGEON_SHORT_NAMES,
 };

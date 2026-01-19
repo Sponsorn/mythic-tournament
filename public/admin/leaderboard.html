@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament - Leaderboard</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <style>
+    /* Podium row backgrounds */
+    tr.podium-1 { background: linear-gradient(90deg, rgba(255, 215, 0, 0.15) 0%, transparent 50%); }
+    tr.podium-2 { background: linear-gradient(90deg, rgba(192, 192, 192, 0.15) 0%, transparent 50%); }
+    tr.podium-3 { background: linear-gradient(90deg, rgba(205, 127, 50, 0.15) 0%, transparent 50%); }
+    tr.podium-1:hover, tr.podium-2:hover, tr.podium-3:hover { background: var(--bg-hover); }
+
+    /* Zebra striping for other rows */
+    .teams-table tbody tr:nth-child(odd):not(.podium-1):not(.podium-2):not(.podium-3) {
+      background: var(--bg-tertiary);
+    }
+
+    /* Medal icons */
+    .medal {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-right: 6px;
+    }
+    .medal-gold { background: linear-gradient(135deg, #ffd700 0%, #ffec8b 50%, #daa520 100%); color: #5c4d00; }
+    .medal-silver { background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 50%, #a8a8a8 100%); color: #404040; }
+    .medal-bronze { background: linear-gradient(135deg, #cd7f32 0%, #daa06d 50%, #b87333 100%); color: #4a2800; }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <header class="admin-header">
+      <div>
+        <h1 class="admin-title">Tournament Leaderboard</h1>
+        <p class="admin-subtitle">Live standings and scores</p>
+      </div>
+      <div class="connection-badge" id="connectionBadge">
+        <span class="status-dot"></span>
+        <span id="connectionText">Connecting...</span>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="admin-nav">
+      <a href="/admin/" class="nav-link">Dashboard</a>
+      <a href="/admin/leaderboard.html" class="nav-link active">Leaderboard</a>
+      <a href="/admin/best-times.html" class="nav-link">Best Times</a>
+    </nav>
+
+    <!-- Leaderboard -->
+    <div class="leaderboard-section">
+      <div class="leaderboard-header">
+        <h2 class="section-title" style="margin: 0;">Leaderboard</h2>
+        <span class="last-update" id="lastUpdate">--</span>
+      </div>
+      <table class="teams-table">
+        <thead>
+          <tr>
+            <th style="width: 50px;">#</th>
+            <th>Team</th>
+            <th style="width: 70px;">Runs</th>
+            <th style="width: 90px;">Highest</th>
+            <th style="width: 90px;">Unique Dungeons</th>
+            <th style="width: 80px;">Deaths</th>
+            <th style="width: 110px;">Score</th>
+            <th style="width: 90px;">Status</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboardBody">
+          <tr>
+            <td colspan="8" style="text-align: center; color: var(--text-muted);">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Recent Runs -->
+    <div class="recent-section">
+      <div class="recent-header">
+        <h2 class="section-title" style="margin: 0;">Recent Completed Runs</h2>
+      </div>
+      <div class="recent-list" id="recentList">
+        <div class="recent-item" style="justify-content: center; color: var(--text-muted);">
+          No completed runs yet
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script>
+    const client = initTournamentClient();
+
+    // DOM Elements
+    const connectionBadge = document.getElementById('connectionBadge');
+    const connectionText = document.getElementById('connectionText');
+    const leaderboardBody = document.getElementById('leaderboardBody');
+    const lastUpdate = document.getElementById('lastUpdate');
+    const recentList = document.getElementById('recentList');
+
+    // State
+    let leaderboard = [];
+    let teamStats = {};
+    let recentRuns = [];
+
+    // Connection events
+    client.on('connected', () => {
+      connectionBadge.classList.add('connected');
+      connectionBadge.classList.remove('disconnected');
+      connectionText.textContent = 'Connected';
+      loadTeamStats();
+    });
+
+    client.on('disconnected', () => {
+      connectionBadge.classList.add('disconnected');
+      connectionBadge.classList.remove('connected');
+      connectionText.textContent = 'Disconnected';
+    });
+
+    // State sync
+    client.on('state:sync', (state) => {
+      leaderboard = state.leaderboard || [];
+      recentRuns = state.recentRuns || [];
+      renderLeaderboard();
+      renderRecentRuns();
+      updateLastPoll(state.lastPollTime);
+    });
+
+    client.on('scoreboard:update', (newLeaderboard) => {
+      leaderboard = newLeaderboard;
+      loadTeamStats(); // Refresh stats when scoreboard updates
+      updateLastPoll(Date.now());
+    });
+
+    client.on('run:complete', (data) => {
+      recentRuns.unshift(data.recap);
+      if (recentRuns.length > 10) recentRuns = recentRuns.slice(0, 10);
+      renderRecentRuns();
+    });
+
+    async function loadTeamStats() {
+      try {
+        const res = await fetch('/api/team-stats');
+        teamStats = await res.json();
+        renderLeaderboard();
+      } catch (err) {
+        console.error('Failed to load team stats:', err);
+        renderLeaderboard();
+      }
+    }
+
+    function updateLastPoll(time) {
+      if (!time) {
+        lastUpdate.textContent = '--';
+        return;
+      }
+      const date = new Date(time);
+      lastUpdate.textContent = `Updated: ${date.toLocaleTimeString()}`;
+    }
+
+    function renderLeaderboard() {
+      if (!leaderboard.length) {
+        leaderboardBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No scores yet</td></tr>';
+        return;
+      }
+
+      const html = leaderboard.map((entry) => {
+        const statusClass = entry.status === 'running' ? 'running' : '';
+        const statusText = entry.status === 'running' ? 'Running' : 'Idle';
+        const rankClass = entry.rank === 1 ? 'first' : entry.rank === 2 ? 'second' : entry.rank === 3 ? 'third' : '';
+        const podiumClass = entry.rank <= 3 ? `podium-${entry.rank}` : '';
+        const stats = teamStats[entry.teamName] || { highestKey: 0, totalDeaths: 0, uniqueDungeons: 0 };
+
+        // Medal for top 3
+        let medalHtml = '';
+        if (entry.rank === 1) medalHtml = '<span class="medal medal-gold">1</span>';
+        else if (entry.rank === 2) medalHtml = '<span class="medal medal-silver">2</span>';
+        else if (entry.rank === 3) medalHtml = '<span class="medal medal-bronze">3</span>';
+
+        return `
+          <tr class="${podiumClass}">
+            <td class="rank-cell ${rankClass}">${medalHtml || entry.rank}</td>
+            <td class="team-name-cell">${escapeHtml(entry.teamName)}</td>
+            <td style="font-family: var(--font-mono);">${entry.runs}</td>
+            <td class="level-cell">+${stats.highestKey || 0}</td>
+            <td style="font-family: var(--font-mono);">${stats.uniqueDungeons || 0}</td>
+            <td class="deaths-cell ${stats.totalDeaths === 0 ? 'zero' : ''}">${stats.totalDeaths || 0}</td>
+            <td style="font-family: var(--font-mono); font-weight: 600;">${entry.points.toLocaleString()}</td>
+            <td class="team-status-cell">
+              <span class="status-indicator ${statusClass}">
+                <span class="status-dot"></span>
+                ${statusText}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      leaderboardBody.innerHTML = html;
+    }
+
+    function renderRecentRuns() {
+      if (!recentRuns.length) {
+        recentList.innerHTML = '<div class="recent-item" style="justify-content: center; color: var(--text-muted);">No completed runs yet</div>';
+        return;
+      }
+
+      const html = recentRuns.map((run, index) => {
+        return `
+          <div class="recent-item">
+            <div class="recent-info">
+              <div class="recent-team">${escapeHtml(run.teamName)}</div>
+              <div class="recent-dungeon">${escapeHtml(run.dungeonName)} +${run.keystoneLevel}</div>
+              <div class="recent-details">
+                ${formatTime(run.duration)} | ${run.deaths} deaths | ${run.timed ? 'Timed' : 'Depleted'}
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+              <div class="recent-points">${run.points}</div>
+              <button class="btn btn-secondary btn-sm" onclick="showRecap(${index})">Show Recap</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      recentList.innerHTML = html;
+    }
+
+    function showRecap(index) {
+      client.showRecap(index, 15000);
+    }
+
+    function formatTime(ms) {
+      if (!ms || ms < 0) return '00:00';
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
+    // Make functions available globally
+    window.showRecap = showRecap;
+  </script>
+</body>
+</html>

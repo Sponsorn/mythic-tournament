@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament Stream Overlay</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/stream-overlay.css">
+</head>
+<body>
+  <div class="stream-overlay" id="streamOverlay">
+    <!-- Icon Section -->
+    <div class="overlay-icon">
+      <div class="overlay-title">Mythic Tournament</div>
+      <div class="placeholder">Logo</div>
+      <div class="overlay-updated" id="dataUpdated">Data updated: --</div>
+      <div class="overlay-next-poll" id="nextPoll">Next update: --</div>
+    </div>
+
+    <!-- Leaderboard Section -->
+    <div class="overlay-leaderboard">
+      <div class="section-header">Top 5</div>
+      <div class="leaderboard-list" id="leaderboardList">
+        <div class="leaderboard-row">
+          <div class="lb-rank">-</div>
+          <div class="lb-name">Loading...</div>
+          <div class="lb-score">-</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Teams 1-5 Section -->
+    <div class="overlay-teams">
+      <div class="section-header">Team Info (1-5)</div>
+      <div class="teams-grid" id="teamsGrid1">
+        <!-- Team cells will be rendered here -->
+      </div>
+    </div>
+
+    <!-- Teams 6-10 Section -->
+    <div class="overlay-teams">
+      <div class="section-header">Team Info (6-10)</div>
+      <div class="teams-grid" id="teamsGrid2">
+        <!-- Team cells will be rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay-connection" id="connectionStatus">Disconnected</div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script>
+    const client = initTournamentClient();
+    const leaderboardListEl = document.getElementById('leaderboardList');
+    const teamsGrid1El = document.getElementById('teamsGrid1');
+    const teamsGrid2El = document.getElementById('teamsGrid2');
+    const connectionStatusEl = document.getElementById('connectionStatus');
+    const dataUpdatedEl = document.getElementById('dataUpdated');
+    const nextPollEl = document.getElementById('nextPoll');
+
+    let currentState = {
+      teams: [],
+      leaderboard: [],
+      activeRuns: []
+    };
+
+    // Dungeon short names mapping
+    let dungeonShortNames = {};
+
+    // Timer update interval
+    let timerInterval = null;
+
+    // Poll countdown
+    let pollCountdownInterval = null;
+    let nextPollTime = null;
+
+    // Fetch dungeon short names on load
+    fetch('/api/dungeon-short-names')
+      .then(res => res.json())
+      .then(data => { dungeonShortNames = data; })
+      .catch(err => console.warn('Failed to load dungeon short names:', err));
+
+    client.on('connected', () => {
+      connectionStatusEl.classList.remove('visible', 'disconnected');
+    });
+
+    client.on('disconnected', () => {
+      connectionStatusEl.textContent = 'Disconnected';
+      connectionStatusEl.classList.add('visible', 'disconnected');
+    });
+
+    client.on('state:sync', (state) => {
+      currentState = {
+        teams: state.teams || [],
+        leaderboard: state.leaderboard || [],
+        activeRuns: state.activeRuns || []
+      };
+      renderAll();
+      startTimerUpdates();
+      updateDataTimestamp(state.lastPollTime);
+      // Start countdown if we have poll info
+      if (state.lastPollTime && state.nextPollMs) {
+        const elapsed = Date.now() - state.lastPollTime;
+        const remaining = Math.max(0, state.nextPollMs - elapsed);
+        startPollCountdown(remaining);
+      }
+    });
+
+    client.on('poll:complete', (data) => {
+      console.log('[Overlay] Poll complete received', data);
+      updateDataTimestamp(data.time);
+      startPollCountdown(data.nextPollMs || 30000);
+      // Flash the updated text to show refresh happened
+      dataUpdatedEl.style.color = 'var(--accent-green)';
+      setTimeout(() => { dataUpdatedEl.style.color = ''; }, 1000);
+      // Re-fetch full state to ensure overlay is up to date
+      fetch('/api/state')
+        .then(res => res.json())
+        .then(state => {
+          currentState = {
+            teams: state.teams || [],
+            leaderboard: state.leaderboard || [],
+            activeRuns: state.activeRuns || []
+          };
+          renderAll();
+        })
+        .catch(err => console.warn('Failed to refresh state:', err));
+    });
+
+    client.on('scoreboard:update', (leaderboard) => {
+      currentState.leaderboard = leaderboard || [];
+      renderLeaderboard();
+    });
+
+    client.on('activeRuns:update', (activeRuns) => {
+      currentState.activeRuns = activeRuns || [];
+      renderTeamGrids();
+    });
+
+    client.on('run:progress', (data) => {
+      updateRunProgress(data);
+    });
+
+    function renderAll() {
+      renderLeaderboard();
+      renderTeamGrids();
+    }
+
+    function renderLeaderboard() {
+      const top5 = currentState.leaderboard.slice(0, 5);
+
+      if (top5.length === 0) {
+        leaderboardListEl.innerHTML = `
+          <div class="leaderboard-row">
+            <div class="lb-rank">-</div>
+            <div class="lb-name">No teams</div>
+            <div class="lb-score">-</div>
+          </div>
+        `;
+        return;
+      }
+
+      const html = top5.map(entry => `
+        <div class="leaderboard-row">
+          <div class="lb-rank">${entry.rank}</div>
+          <div class="lb-name">${escapeHtml(entry.teamName)}</div>
+          <div class="lb-score">${formatNumber(entry.points)}</div>
+        </div>
+      `).join('');
+
+      leaderboardListEl.innerHTML = html;
+    }
+
+    function renderTeamGrids() {
+      // Get teams sorted by team number
+      const sortedTeams = [...currentState.teams].sort((a, b) => a.id - b.id);
+
+      // Teams 1-5 (indices 0-4)
+      const teams1to5 = sortedTeams.slice(0, 5);
+      // Teams 6-10 (indices 5-9)
+      const teams6to10 = sortedTeams.slice(5, 10);
+
+      teamsGrid1El.innerHTML = renderTeamCells(teams1to5, 1);
+      teamsGrid2El.innerHTML = renderTeamCells(teams6to10, 6);
+    }
+
+    function renderTeamCells(teams, startNumber) {
+      const cells = [];
+
+      for (let i = 0; i < 5; i++) {
+        const team = teams[i];
+        const slotNumber = startNumber + i;
+
+        if (!team) {
+          cells.push(`
+            <div class="team-cell idle">
+              <div class="team-cell-number">#${slotNumber}</div>
+              <div class="team-cell-name">-</div>
+              <div class="team-cell-empty">Empty slot</div>
+            </div>
+          `);
+          continue;
+        }
+
+        const activeRun = currentState.activeRuns.find(r => r.teamName === team.name);
+        const isRunning = !!activeRun;
+
+        if (isRunning) {
+          const elapsed = activeRun.progress?.elapsed || (Date.now() - activeRun.startTime);
+          const percentage = activeRun.progress?.percentage || 0;
+          const deaths = activeRun.deaths || 0;
+          const timerClass = getTimerClass(elapsed, activeRun.parTime);
+          const deathsClass = deaths === 0 ? 'zero' : '';
+
+          cells.push(`
+            <div class="team-cell running"
+                 data-team="${escapeHtml(team.name)}"
+                 data-start="${activeRun.startTime}"
+                 data-par="${activeRun.parTime}">
+              <div class="team-cell-number">#${slotNumber}</div>
+              <div class="team-cell-name">${escapeHtml(team.name)}</div>
+              <div class="team-run-info">
+                <span class="team-dungeon">${escapeHtml(getShortDungeonName(activeRun.dungeonName))}</span>
+                <span class="team-level">+${activeRun.keystoneLevel}</span>
+              </div>
+              <div class="team-progress">
+                <div class="team-progress-bar ${timerClass}">
+                  <div class="fill" style="width: ${percentage}%"></div>
+                </div>
+              </div>
+              <div class="team-stats">
+                <span class="team-percentage">${percentage.toFixed(0)}%</span>
+                <span class="team-timer ${timerClass}">${formatTime(elapsed)}</span>
+                <span class="team-deaths ${deathsClass}">${deaths}D</span>
+              </div>
+            </div>
+          `);
+        } else {
+          // Team exists but not running
+          const lbEntry = currentState.leaderboard.find(e => e.teamName === team.name);
+          const points = lbEntry?.points || 0;
+          const runs = lbEntry?.runs || 0;
+
+          cells.push(`
+            <div class="team-cell idle" data-team="${escapeHtml(team.name)}">
+              <div class="team-cell-number">#${slotNumber}</div>
+              <div class="team-cell-name">${escapeHtml(team.name)}</div>
+              <div class="team-idle-status">
+                <span>${formatNumber(points)} pts</span>
+                <span>${runs} run${runs !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+          `);
+        }
+      }
+
+      return cells.join('');
+    }
+
+    function updateRunProgress(data) {
+      const cell = document.querySelector(`[data-team="${data.teamName}"]`);
+      if (!cell || !cell.classList.contains('running')) return;
+
+      const percentageEl = cell.querySelector('.team-percentage');
+      const fillEl = cell.querySelector('.team-progress-bar .fill');
+      const deathsEl = cell.querySelector('.team-deaths');
+
+      if (data.progress?.percentage !== undefined && percentageEl && fillEl) {
+        percentageEl.textContent = `${data.progress.percentage.toFixed(0)}%`;
+        fillEl.style.width = `${data.progress.percentage}%`;
+      }
+
+      if (data.deaths !== undefined && deathsEl) {
+        deathsEl.textContent = `${data.deaths}D`;
+        if (data.deaths === 0) {
+          deathsEl.classList.add('zero');
+        } else {
+          deathsEl.classList.remove('zero');
+        }
+      }
+    }
+
+    function startTimerUpdates() {
+      if (timerInterval) clearInterval(timerInterval);
+
+      timerInterval = setInterval(() => {
+        const runningCells = document.querySelectorAll('.team-cell.running');
+        runningCells.forEach(cell => {
+          const startTime = parseInt(cell.dataset.start);
+          const parTime = parseInt(cell.dataset.par);
+          const timerEl = cell.querySelector('.team-timer');
+          const progressBar = cell.querySelector('.team-progress-bar');
+
+          if (startTime && timerEl) {
+            const elapsed = Date.now() - startTime;
+            const timerClass = getTimerClass(elapsed, parTime);
+            timerEl.textContent = formatTime(elapsed);
+            timerEl.className = `team-timer ${timerClass}`;
+
+            if (progressBar) {
+              progressBar.classList.remove('overtime');
+              if (timerClass === 'overtime') {
+                progressBar.classList.add('overtime');
+              }
+            }
+          }
+        });
+      }, 1000);
+    }
+
+    function getTimerClass(elapsed, parTime) {
+      if (!parTime) return '';
+      const ratio = elapsed / parTime;
+      if (ratio >= 1) return 'overtime';
+      if (ratio >= 0.9) return 'warning';
+      return '';
+    }
+
+    function formatTime(ms) {
+      if (!ms || ms < 0) return '00:00';
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function formatNumber(num) {
+      return (num || 0).toLocaleString();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function getShortDungeonName(dungeonName) {
+      const slug = String(dungeonName || '')
+        .toLowerCase()
+        .trim()
+        .replace(/['`]/g, "'")
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      return dungeonShortNames[slug] || dungeonName.substring(0, 4).toUpperCase();
+    }
+
+    function updateDataTimestamp(time) {
+      if (!time) {
+        dataUpdatedEl.textContent = 'Data updated: --';
+        return;
+      }
+      const date = new Date(time);
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      dataUpdatedEl.textContent = `Data updated: ${timeStr}`;
+    }
+
+    function startPollCountdown(intervalMs) {
+      nextPollTime = Date.now() + intervalMs;
+
+      if (pollCountdownInterval) clearInterval(pollCountdownInterval);
+
+      function updateCountdown() {
+        const remaining = Math.max(0, nextPollTime - Date.now());
+        const seconds = Math.ceil(remaining / 1000);
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        nextPollEl.textContent = `Next update: ${mins}:${secs.toString().padStart(2, '0')}`;
+
+        // Auto-refresh when countdown reaches 0
+        if (remaining <= 0) {
+          clearInterval(pollCountdownInterval);
+          refreshData();
+        }
+      }
+
+      updateCountdown();
+      pollCountdownInterval = setInterval(updateCountdown, 1000);
+    }
+
+    function refreshData() {
+      console.log('[Overlay] Auto-refreshing data...');
+      fetch('/api/state')
+        .then(res => res.json())
+        .then(state => {
+          currentState = {
+            teams: state.teams || [],
+            leaderboard: state.leaderboard || [],
+            activeRuns: state.activeRuns || []
+          };
+          renderAll();
+          updateDataTimestamp(state.lastPollTime);
+          // Flash to show refresh
+          dataUpdatedEl.style.color = 'var(--accent-green)';
+          setTimeout(() => { dataUpdatedEl.style.color = ''; }, 1000);
+          // Restart countdown based on state or default to 30s
+          const nextInterval = state.nextPollMs || 30000;
+          if (state.lastPollTime) {
+            const elapsed = Date.now() - state.lastPollTime;
+            const remaining = Math.max(5000, nextInterval - elapsed); // Min 5s to avoid rapid polling
+            startPollCountdown(remaining);
+          } else {
+            startPollCountdown(nextInterval);
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to refresh state:', err);
+          // Retry in 10 seconds on error
+          startPollCountdown(10000);
+        });
+    }
+  </script>
+</body>
+</html>

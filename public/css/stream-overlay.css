@@ -182,11 +182,12 @@ body {
   background: var(--bg-secondary);
   padding: 4px var(--spacing-sm);
   display: grid;
-  grid-template-columns: 60px 110px 60px 1fr;
+  grid-template-columns: 60px 145px 100px 1fr;
   align-items: center;
   gap: var(--spacing-sm);
   min-width: 0;
   border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
   flex: 1;
 }
 
@@ -237,7 +238,8 @@ body {
   font-size: 14px;
   font-weight: 700;
   color: #ffffff;
-  text-align: right;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .team-cell-status {

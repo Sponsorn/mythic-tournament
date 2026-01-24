@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>M+ Tournament - Admin Dashboard</title>
   <link rel="stylesheet" href="/css/common.css">
-  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/theme.css">
 </head>
 <body>
   <div class="admin-container">
@@ -304,7 +304,7 @@
             <td class="team-number">${team.id || '-'}</td>
             <td class="team-name-cell">${escapeHtml(team.name)}</td>
             <td class="team-bracket"><span class="bracket-badge bracket-${bracket.toLowerCase()}">${bracket}</span></td>
-            <td style="font-family: var(--font-mono);">${score.toLocaleString()}</td>
+            <td class="score-cell">${getScoreMedal(entry?.rank)}${score.toLocaleString()}</td>
             <td class="team-active-cell">
               <div class="active-toggle-row">
                 <label class="toggle-switch">
@@ -428,6 +428,13 @@
     }
 
     // Utility functions
+    function getScoreMedal(rank) {
+      if (rank === 1) return '<span class="score-medal score-medal-gold">1</span>';
+      if (rank === 2) return '<span class="score-medal score-medal-silver">2</span>';
+      if (rank === 3) return '<span class="score-medal score-medal-bronze">3</span>';
+      return '';
+    }
+
     function extractCode(url) {
       if (!url) return '';
       const match = url.match(/\/reports\/([A-Za-z0-9]{16})/);

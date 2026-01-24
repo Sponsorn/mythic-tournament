@@ -12,7 +12,7 @@
     <!-- Icon Section -->
     <div class="overlay-icon">
       <div class="overlay-title">Mythic Tournament</div>
-      <div class="placeholder">Logo</div>
+      <img src="/images/luckywipelogo.png" alt="Tournament Logo" class="overlay-logo">
       <div class="overlay-updated" id="dataUpdated">Data updated: --</div>
       <div class="overlay-next-poll" id="nextPoll">Next update: --</div>
     </div>
@@ -49,6 +49,7 @@
   <div class="overlay-connection" id="connectionStatus">Disconnected</div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/utils.js"></script>
   <script src="/js/socket-client.js"></script>
   <script>
     const client = initTournamentClient();
@@ -165,7 +166,7 @@
         <div class="leaderboard-row">
           <div class="lb-rank">${entry.rank}</div>
           <div class="lb-name">${escapeHtml(entry.teamName)}</div>
-          <div class="lb-score">${formatNumber(entry.points)}</div>
+          <div class="lb-score">Points: ${formatNumber(entry.points)}</div>
         </div>
       `).join('');
 
@@ -195,9 +196,10 @@
         if (!team) {
           cells.push(`
             <div class="team-cell idle">
-              <div class="team-cell-number">#${slotNumber}</div>
+              <div class="team-cell-number">Team ${slotNumber}</div>
               <div class="team-cell-name">-</div>
-              <div class="team-cell-empty">Empty slot</div>
+              <div class="team-cell-points">-</div>
+              <div class="team-cell-status">Empty slot</div>
             </div>
           `);
           continue;
@@ -205,54 +207,32 @@
 
         const activeRun = currentState.activeRuns.find(r => r.teamName === team.name);
         const isRunning = !!activeRun;
+        const lbEntry = currentState.leaderboard.find(e => e.teamName === team.name);
+        const points = lbEntry?.points || 0;
+
+        // Determine run status text
+        let runStatusText = '';
+        let statusClass = 'idle';
 
         if (isRunning) {
-          const elapsed = activeRun.progress?.elapsed || (Date.now() - activeRun.startTime);
-          const percentage = activeRun.progress?.percentage || 0;
-          const deaths = activeRun.deaths || 0;
-          const timerClass = getTimerClass(elapsed, activeRun.parTime);
-          const deathsClass = deaths === 0 ? 'zero' : '';
-
-          cells.push(`
-            <div class="team-cell running"
-                 data-team="${escapeHtml(team.name)}"
-                 data-start="${activeRun.startTime}"
-                 data-par="${activeRun.parTime}">
-              <div class="team-cell-number">#${slotNumber}</div>
-              <div class="team-cell-name">${escapeHtml(team.name)}</div>
-              <div class="team-run-info">
-                <span class="team-dungeon">${escapeHtml(getShortDungeonName(activeRun.dungeonName))}</span>
-                <span class="team-level">+${activeRun.keystoneLevel}</span>
-              </div>
-              <div class="team-progress">
-                <div class="team-progress-bar ${timerClass}">
-                  <div class="fill" style="width: ${percentage}%"></div>
-                </div>
-              </div>
-              <div class="team-stats">
-                <span class="team-percentage">${percentage.toFixed(0)}%</span>
-                <span class="team-timer ${timerClass}">${formatTime(elapsed)}</span>
-                <span class="team-deaths ${deathsClass}">${deaths}D</span>
-              </div>
-            </div>
-          `);
+          statusClass = 'active';
+          if (activeRun.dungeonName) {
+            runStatusText = `Active - ${escapeHtml(activeRun.dungeonName)} +${activeRun.keystoneLevel}`;
+          } else {
+            runStatusText = 'Active - Waiting for dungeon details';
+          }
         } else {
-          // Team exists but not running
-          const lbEntry = currentState.leaderboard.find(e => e.teamName === team.name);
-          const points = lbEntry?.points || 0;
-          const runs = lbEntry?.runs || 0;
-
-          cells.push(`
-            <div class="team-cell idle" data-team="${escapeHtml(team.name)}">
-              <div class="team-cell-number">#${slotNumber}</div>
-              <div class="team-cell-name">${escapeHtml(team.name)}</div>
-              <div class="team-idle-status">
-                <span>${formatNumber(points)} pts</span>
-                <span>${runs} run${runs !== 1 ? 's' : ''}</span>
-              </div>
-            </div>
-          `);
+          runStatusText = 'Idle';
         }
+
+        cells.push(`
+          <div class="team-cell ${statusClass}" data-team="${escapeHtml(team.name)}">
+            <div class="team-cell-number">Team ${slotNumber}</div>
+            <div class="team-cell-name">${escapeHtml(team.name)}</div>
+            <div class="team-cell-points">${formatNumber(points)}</div>
+            <div class="team-cell-status">${runStatusText}</div>
+          </div>
+        `);
       }
 
       return cells.join('');
@@ -309,31 +289,6 @@
       }, 1000);
     }
 
-    function getTimerClass(elapsed, parTime) {
-      if (!parTime) return '';
-      const ratio = elapsed / parTime;
-      if (ratio >= 1) return 'overtime';
-      if (ratio >= 0.9) return 'warning';
-      return '';
-    }
-
-    function formatTime(ms) {
-      if (!ms || ms < 0) return '00:00';
-      const totalSeconds = Math.floor(ms / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
-
-    function formatNumber(num) {
-      return (num || 0).toLocaleString();
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
 
     function getShortDungeonName(dungeonName) {
       const slug = String(dungeonName || '')
@@ -349,12 +304,13 @@
 
     function updateDataTimestamp(time) {
       if (!time) {
-        dataUpdatedEl.textContent = 'Data updated: --';
+        dataUpdatedEl.textContent = 'Data updated: --:--';
         return;
       }
       const date = new Date(time);
-      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      dataUpdatedEl.textContent = `Data updated: ${timeStr}`;
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      dataUpdatedEl.textContent = `Data updated: ${hours}:${minutes}`;
     }
 
     function startPollCountdown(intervalMs) {
@@ -364,21 +320,29 @@
 
       function updateCountdown() {
         const remaining = Math.max(0, nextPollTime - Date.now());
+
+        if (remaining <= 0) {
+          clearInterval(pollCountdownInterval);
+          pollCountdownInterval = null;
+          nextPollEl.textContent = 'Updating...';
+          refreshData();
+          return;
+        }
+
         const seconds = Math.ceil(remaining / 1000);
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         nextPollEl.textContent = `Next update: ${mins}:${secs.toString().padStart(2, '0')}`;
-
-        // Auto-refresh when countdown reaches 0
-        if (remaining <= 0) {
-          clearInterval(pollCountdownInterval);
-          refreshData();
-        }
       }
 
       updateCountdown();
       pollCountdownInterval = setInterval(updateCountdown, 1000);
     }
+
+    window.addEventListener('beforeunload', () => {
+      if (timerInterval) clearInterval(timerInterval);
+      if (pollCountdownInterval) clearInterval(pollCountdownInterval);
+    });
 
     function refreshData() {
       console.log('[Overlay] Auto-refreshing data...');
@@ -395,20 +359,21 @@
           // Flash to show refresh
           dataUpdatedEl.style.color = 'var(--accent-green)';
           setTimeout(() => { dataUpdatedEl.style.color = ''; }, 1000);
-          // Restart countdown based on state or default to 30s
-          const nextInterval = state.nextPollMs || 30000;
-          if (state.lastPollTime) {
+          // Restart countdown only if server has a future poll scheduled
+          if (state.lastPollTime && state.nextPollMs) {
             const elapsed = Date.now() - state.lastPollTime;
-            const remaining = Math.max(5000, nextInterval - elapsed); // Min 5s to avoid rapid polling
-            startPollCountdown(remaining);
-          } else {
-            startPollCountdown(nextInterval);
+            const remaining = state.nextPollMs - elapsed;
+            if (remaining > 0) {
+              startPollCountdown(remaining);
+            } else {
+              // Server hasn't polled yet, silently retry
+              setTimeout(refreshData, 5000);
+            }
           }
         })
         .catch(err => {
           console.warn('Failed to refresh state:', err);
-          // Retry in 10 seconds on error
-          startPollCountdown(10000);
+          setTimeout(refreshData, 5000);
         });
     }
   </script>

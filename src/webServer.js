@@ -6,10 +6,22 @@ const stateManager = require('./stateManager');
 const { updateTeam, upsertTeam, findTeam, renameTeamInLeaderboard, saveTeams, getTeams, getBestRunsPerDungeon, getAllDungeonNames, readScoresAsObjects } = require('./wclStorage');
 const { wclExtractCode } = require('./wclApi');
 const { DUNGEON_PAR_MS, DUNGEON_SHORT_NAMES } = require('./wclScoring');
+const { CORS_ORIGINS, ADMIN_SECRET } = require('./config');
 
 let io = null;
 let server = null;
 let forceRefreshCallback = null;
+let stateListeners = [];
+
+function validateRequired(data, fields) {
+  if (!data || typeof data !== 'object') return 'Invalid request data';
+  for (const field of fields) {
+    if (data[field] === undefined || data[field] === null || data[field] === '') {
+      return `Missing required field: ${field}`;
+    }
+  }
+  return null;
+}
 
 function createWebServer(config = {}) {
   const port = config.port || process.env.WEB_PORT || 3000;
@@ -18,10 +30,13 @@ function createWebServer(config = {}) {
   const app = express();
   server = http.createServer(app);
 
-  // Initialize Socket.io with CORS for OBS browser sources
+  // Initialize Socket.io with CORS
+  const corsOrigin = CORS_ORIGINS
+    ? CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+    : '*';
   io = new Server(server, {
     cors: {
-      origin: '*',
+      origin: corsOrigin,
       methods: ['GET', 'POST'],
     },
   });
@@ -117,11 +132,23 @@ function createWebServer(config = {}) {
   io.on('connection', (socket) => {
     console.log(`[WebSocket] Client connected: ${socket.id}`);
 
+    // Check admin auth from handshake
+    const isAdmin = !ADMIN_SECRET || socket.handshake.auth?.secret === ADMIN_SECRET;
+
+    function requireAdmin() {
+      if (!isAdmin) {
+        socket.emit('admin:response', { success: false, message: 'Unauthorized' });
+        return false;
+      }
+      return true;
+    }
+
     // Send full state on connect
     socket.emit('state:sync', stateManager.getFullState());
 
     // Admin: Update team report code (legacy)
     socket.on('admin:setReportCode', async (data) => {
+      if (!requireAdmin()) return;
       const { teamName, teamNumber, reportCode, backupCode } = data;
 
       const code = wclExtractCode(reportCode);
@@ -145,6 +172,12 @@ function createWebServer(config = {}) {
 
     // Admin: Update team (name, leader, report codes, bracket)
     socket.on('admin:updateTeam', async (data) => {
+      if (!requireAdmin()) return;
+      const validationError = validateRequired(data, ['originalName']);
+      if (validationError) {
+        socket.emit('admin:response', { success: false, message: validationError });
+        return;
+      }
       const { originalName, newTeamName, leaderName, reportCode, backupCode, bracket } = data;
 
       const code = wclExtractCode(reportCode);
@@ -185,6 +218,12 @@ function createWebServer(config = {}) {
 
     // Admin: Force refresh a team
     socket.on('admin:forceRefresh', async (data) => {
+      if (!requireAdmin()) return;
+      const validationError = validateRequired(data, ['teamName']);
+      if (validationError) {
+        socket.emit('admin:response', { success: false, message: validationError });
+        return;
+      }
       const { teamName } = data;
       if (forceRefreshCallback) {
         try {
@@ -200,6 +239,7 @@ function createWebServer(config = {}) {
 
     // Admin: Tournament control
     socket.on('admin:tournament', (data) => {
+      if (!requireAdmin()) return;
       const { action } = data;
       if (action === 'pause') {
         stateManager.setTournamentStatus('paused');
@@ -211,16 +251,84 @@ function createWebServer(config = {}) {
       socket.emit('admin:response', { success: true, message: `Tournament ${action}d` });
     });
 
-    // Admin: Trigger recap display
-    socket.on('admin:showRecap', (data) => {
-      const { runIndex, duration } = data;
-      const run = stateManager.state.recentRuns[runIndex];
-      if (run) {
-        io.emit('recap:show', { recap: run, duration: duration || 15000 });
-        socket.emit('admin:response', { success: true, message: 'Recap triggered' });
-      } else {
-        socket.emit('admin:response', { success: false, message: 'Run not found' });
+    // Admin: Toggle active run (set team as active without dungeon details)
+    socket.on('admin:toggleActiveRun', (data) => {
+      if (!requireAdmin()) return;
+      const validationError = validateRequired(data, ['teamName']);
+      if (validationError) {
+        socket.emit('admin:response', { success: false, message: validationError });
+        return;
       }
+      const { teamName, active } = data;
+      console.log(`[Admin] Toggle active run: ${teamName} -> ${active}`);
+
+      // Verify team exists
+      const team = findTeam(teamName);
+      if (!team) {
+        socket.emit('admin:response', { success: false, message: 'Team not found' });
+        return;
+      }
+
+      if (active) {
+        // Set as active without dungeon details
+        stateManager.onRunStart(teamName, {
+          fightId: `manual-${Date.now()}`,
+          dungeonName: null,
+          keystoneLevel: null,
+          startTime: Date.now(),
+          totalBosses: 3,
+          parTime: 1800000,
+        });
+        socket.emit('admin:response', { success: true, message: `${teamName} set as active` });
+      } else {
+        // Clear the run using proper method
+        const hadRun = stateManager.onRunClear(teamName);
+        socket.emit('admin:response', {
+          success: true,
+          message: hadRun ? `${teamName} set as idle` : `${teamName} was not active`
+        });
+      }
+    });
+
+    // Admin: Set run details for an active team
+    socket.on('admin:setRunDetails', (data) => {
+      if (!requireAdmin()) return;
+      const validationError = validateRequired(data, ['teamName', 'dungeonName', 'keystoneLevel']);
+      if (validationError) {
+        socket.emit('admin:response', { success: false, message: validationError });
+        return;
+      }
+      const { teamName, dungeonName, keystoneLevel } = data;
+
+      // Find existing active run
+      const run = stateManager.state.activeRuns.find(r => r.teamName === teamName);
+      if (!run) {
+        socket.emit('admin:response', { success: false, message: `${teamName} is not active` });
+        return;
+      }
+
+      // Update dungeon details
+      run.dungeonName = dungeonName;
+      run.keystoneLevel = keystoneLevel;
+
+      // Get par time for dungeon
+      const slug = dungeonName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      run.parTime = DUNGEON_PAR_MS[slug] || 1800000;
+
+      // Broadcast update
+      io.emit('activeRuns:update', stateManager.state.activeRuns);
+      socket.emit('admin:response', { success: true, message: `${teamName} details updated` });
+    });
+
+    // Admin: Clear active run manually (legacy, kept for compatibility)
+    socket.on('admin:clearActiveRun', (data) => {
+      if (!requireAdmin()) return;
+      const { teamName } = data;
+      const hadRun = stateManager.onRunClear(teamName);
+      socket.emit('admin:response', {
+        success: true,
+        message: hadRun ? `${teamName} run cleared` : `${teamName} was not running`
+      });
     });
 
     socket.on('disconnect', () => {
@@ -229,37 +337,42 @@ function createWebServer(config = {}) {
   });
 
   // Forward state manager events to WebSocket clients
-  stateManager.on('scoreboard:update', (leaderboard) => {
+  stateListeners = [];
+
+  function addStateListener(event, handler) {
+    stateManager.on(event, handler);
+    stateListeners.push({ event, handler });
+  }
+
+  addStateListener('scoreboard:update', (leaderboard) => {
     io.emit('scoreboard:update', leaderboard);
   });
 
-  stateManager.on('activeRuns:update', (activeRuns) => {
+  addStateListener('activeRuns:update', (activeRuns) => {
     io.emit('activeRuns:update', activeRuns);
   });
 
-  stateManager.on('run:start', (data) => {
+  addStateListener('run:start', (data) => {
     io.emit('run:start', data);
   });
 
-  stateManager.on('run:progress', (data) => {
+  addStateListener('run:progress', (data) => {
     io.emit('run:progress', data);
   });
 
-  stateManager.on('run:complete', (data) => {
+  addStateListener('run:complete', (data) => {
     io.emit('run:complete', data);
-    // Auto-show recap
-    io.emit('recap:show', { recap: data.recap, duration: 15000 });
   });
 
-  stateManager.on('quota:update', (quota) => {
+  addStateListener('quota:update', (quota) => {
     io.emit('quota:update', quota);
   });
 
-  stateManager.on('teams:update', (teams) => {
+  addStateListener('teams:update', (teams) => {
     io.emit('teams:update', teams);
   });
 
-  stateManager.on('poll:complete', (data) => {
+  addStateListener('poll:complete', (data) => {
     io.emit('poll:complete', data);
   });
 
@@ -269,9 +382,7 @@ function createWebServer(config = {}) {
       console.log(`[WebServer] Running at http://${host}:${port}`);
       console.log(`[WebServer] Overlays available at:`);
       console.log(`  - Stream Overlay (1920x300): http://${host}:${port}/overlays/stream-overlay.html`);
-      console.log(`  - Scoreboard: http://${host}:${port}/overlays/scoreboard.html`);
-      console.log(`  - Active Runs: http://${host}:${port}/overlays/active-runs.html`);
-      console.log(`  - Recap: http://${host}:${port}/overlays/recap.html`);
+      console.log(`  - Scoreboard Fullscreen: http://${host}:${port}/overlays/scoreboard-fullscreen.html`);
       console.log(`  - Admin: http://${host}:${port}/admin/`);
       resolve({ app, server, io });
     });
@@ -297,6 +408,12 @@ function getIO() {
 }
 
 function stopServer() {
+  // Remove state manager listeners to prevent leaks
+  for (const { event, handler } of stateListeners) {
+    stateManager.removeListener(event, handler);
+  }
+  stateListeners = [];
+
   return new Promise((resolve) => {
     if (server) {
       server.close(() => {

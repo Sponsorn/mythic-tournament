@@ -5,8 +5,7 @@ Real-time Mythic+ tournament tracking system with OBS overlays. Web server with 
 ## Features
 
 - **Live Scoreboard Overlay** - Real-time team rankings for OBS browser sources
-- **Active Runs Tracker** - Shows teams currently in dungeons with progress
-- **Run Recap Display** - Auto-triggered completion summaries with scores
+- **Stream Overlay** - Top bar overlay with leaderboard and team status
 - **Admin Dashboard** - Web-based team management and tournament control
 - **Bracket System** - Teams assigned to skill brackets (A/B/C) with different point scales
 - **Warcraft Logs Integration** - Automatic run detection via WCL API polling
@@ -22,9 +21,8 @@ Real-time Mythic+ tournament tracking system with OBS overlays. Web server with 
 │                                         └───────┬───────┘   │
 │  ┌───────────────────────────────────────────────┴────────┐ │
 │  │              Express Web Server (:3000)                │ │
-│  │  /overlays/scoreboard.html                             │ │
-│  │  /overlays/active-runs.html                            │ │
-│  │  /overlays/recap.html                                  │ │
+│  │  /overlays/stream-overlay.html                          │ │
+│  │  /overlays/scoreboard-fullscreen.html                   │ │
 │  │  /admin/                                               │ │
 │  └────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
@@ -76,9 +74,9 @@ Add browser sources with these URLs (replace `SERVER_IP` with your server's IP):
 
 | Overlay | URL | Recommended Size |
 |---------|-----|------------------|
-| Scoreboard | `http://SERVER_IP:3000/overlays/scoreboard.html` | 400x600 |
-| Active Runs | `http://SERVER_IP:3000/overlays/active-runs.html` | 500x300 |
-| Recap | `http://SERVER_IP:3000/overlays/recap.html` | 600x400 |
+| Stream Overlay | `http://SERVER_IP:3000/overlays/stream-overlay.html` | 1920x300 |
+| Scoreboard Fullscreen | `http://SERVER_IP:3000/overlays/scoreboard-fullscreen.html` | 1920x1080 |
+| Countdown | `http://SERVER_IP:3000/overlays/countdown.html` | 1920x1080 |
 
 All overlays have transparent backgrounds for easy compositing.
 
@@ -91,7 +89,6 @@ Features:
 - Edit team names, leaders, brackets, and WCL report codes
 - Force refresh individual teams
 - Pause/resume tournament polling
-- Trigger run recaps manually
 - View best times per dungeon
 
 ## Bracket Scoring System
@@ -145,7 +142,6 @@ data/
 | `run:start` | New run detected |
 | `run:progress` | Run progress update |
 | `run:complete` | Run finished |
-| `recap:show` | Display run recap |
 | `teams:update` | Team data changed |
 | `quota:update` | API usage update |
 
@@ -155,7 +151,6 @@ data/
 | `admin:updateTeam` | Edit team details (including bracket) |
 | `admin:forceRefresh` | Force poll a team |
 | `admin:tournament` | Pause/resume polling |
-| `admin:showRecap` | Trigger recap display |
 
 ## API Quota
 

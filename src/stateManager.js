@@ -48,6 +48,7 @@ class StateManager extends EventEmitter {
       leaderName: team.leader_name || '',
       wclUrl: team.wcl_url || '',
       wclBackupUrl: team.wcl_backup_url || '',
+      bracket: team.bracket || 'A',
       status: 'idle', // 'idle', 'running', 'completed'
       lastRun: meta[team.team_name]?.last || null,
       runCount: meta[team.team_name]?.runs || 0,
@@ -144,8 +145,9 @@ class StateManager extends EventEmitter {
       id: `${teamName}-${runData.fightId}`,
       teamName,
       fightId: runData.fightId,
-      dungeonName: runData.dungeonName || 'Unknown Dungeon',
-      keystoneLevel: runData.keystoneLevel || 0,
+      // Preserve null/undefined to indicate "waiting for details"
+      dungeonName: runData.dungeonName !== undefined ? runData.dungeonName : 'Unknown Dungeon',
+      keystoneLevel: runData.keystoneLevel !== undefined ? runData.keystoneLevel : 0,
       startTime: runData.startTime || Date.now(),
       progress: {
         percentage: 0,
@@ -166,6 +168,15 @@ class StateManager extends EventEmitter {
 
     this.emit('run:start', { teamName, run });
     this.emit('activeRuns:update', this.state.activeRuns);
+  }
+
+  // Called to clear an active run manually
+  onRunClear(teamName) {
+    const hadRun = this.state.activeRuns.some(r => r.teamName === teamName);
+    this.state.activeRuns = this.state.activeRuns.filter(r => r.teamName !== teamName);
+    this.updateTeamStatus(teamName, 'idle');
+    this.emit('activeRuns:update', this.state.activeRuns);
+    return hadRun;
   }
 
   // Called when run progress is updated

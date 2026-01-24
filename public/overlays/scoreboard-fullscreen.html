@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament - Fullscreen Scoreboard</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <style>
+    /* Custom color theme */
+    :root {
+      --bg-primary: #0a1530;
+      --bg-secondary: #0c2448;
+      --bg-tertiary: #0e2a52;
+      --bg-hover: #102f5c;
+      --border-subtle: #1a3a6e;
+      --text-primary: #ffffff;
+      --text-secondary: #e0e8f0;
+      --text-muted: #a0b4d0;
+    }
+
+    /* Fullscreen scoreboard for 1920x1080 OBS canvas */
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    .scoreboard-container {
+      position: absolute;
+
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-primary);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    /* Header */
+    .scoreboard-header {
+      background: var(--bg-secondary);
+      padding: var(--spacing-xl) var(--spacing-xl);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+    }
+
+    .scoreboard-title {
+      font-size: 36px;
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 0 20px rgba(255, 255, 255, 0.2);
+    }
+
+    .scoreboard-subtitle {
+      font-size: 18px;
+      color: #e0e8f0;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+
+    /* Column Headers */
+    .scoreboard-columns {
+      display: grid;
+      grid-template-columns: 80px 1fr 140px 160px 120px 160px 120px;
+      gap: var(--spacing-md);
+      padding: var(--spacing-lg) var(--spacing-xl);
+      background: var(--bg-tertiary);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .col-center {
+      text-align: center;
+    }
+
+    .col-right {
+      text-align: right;
+    }
+
+    /* Scrollable body */
+    .scoreboard-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--spacing-sm) var(--spacing-lg);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    /* Team Card Row */
+    .team-card {
+      display: grid;
+      grid-template-columns: 80px 1fr 140px 160px 120px 160px 120px;
+      gap: var(--spacing-md);
+      padding: var(--spacing-lg) var(--spacing-lg);
+      background: var(--bg-secondary);
+      border-radius: var(--radius-md);
+      align-items: center;
+      transition: background var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .team-card:hover {
+      background: var(--bg-hover);
+    }
+
+    .team-card.rank-changed {
+      background: rgba(74, 222, 128, 0.15);
+    }
+
+    /* Podium styling */
+    .team-card.podium-1 {
+      background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, var(--bg-secondary) 30%);
+      border-left: 4px solid #ffd700;
+    }
+
+    .team-card.podium-2 {
+      background: linear-gradient(90deg, rgba(192, 192, 192, 0.2) 0%, var(--bg-secondary) 30%);
+      border-left: 4px solid #c0c0c0;
+    }
+
+    .team-card.podium-3 {
+      background: linear-gradient(90deg, rgba(205, 127, 50, 0.2) 0%, var(--bg-secondary) 30%);
+      border-left: 4px solid #cd7f32;
+    }
+
+    /* Rank Cell */
+    .team-rank {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+    }
+
+    .rank-number {
+      font-family: var(--font-mono);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .team-card.podium-1 .rank-number { color: #ffd700; }
+    .team-card.podium-2 .rank-number { color: #c0c0c0; }
+    .team-card.podium-3 .rank-number { color: #cd7f32; }
+
+    .medal {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .medal-gold {
+      background: linear-gradient(135deg, #ffd700 0%, #ffec8b 50%, #daa520 100%);
+      color: #5c4d00;
+    }
+
+    .medal-silver {
+      background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 50%, #a8a8a8 100%);
+      color: #404040;
+    }
+
+    .medal-bronze {
+      background: linear-gradient(135deg, #cd7f32 0%, #daa06d 50%, #b87333 100%);
+      color: #4a2800;
+    }
+
+    /* Team Name Cell */
+    .team-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .team-name {
+      font-size: 22px;
+      font-weight: 600;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .team-meta {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* Bracket Badge */
+    .bracket-cell {
+      display: flex;
+      justify-content: center;
+    }
+
+    .bracket-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--radius-sm);
+      font-size: 16px;
+      font-weight: 600;
+      min-width: 100px;
+    }
+
+    .bracket-a {
+      background: rgba(96, 165, 250, 0.2);
+      color: var(--accent-blue);
+      border: 1px solid rgba(96, 165, 250, 0.3);
+    }
+
+    .bracket-b {
+      background: rgba(74, 222, 128, 0.2);
+      color: var(--accent-green);
+      border: 1px solid rgba(74, 222, 128, 0.3);
+    }
+
+    .bracket-c {
+      background: rgba(251, 191, 36, 0.2);
+      color: var(--accent-yellow);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+
+    .bracket-d {
+      background: rgba(168, 85, 247, 0.2);
+      color: #a855f7;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+    }
+
+    /* Stats Cells */
+    .stat-cell {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .stat-cell.highlight {
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    /* Score Cell */
+    .score-cell {
+      font-family: var(--font-mono);
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffffff;
+      text-align: right;
+    }
+
+    .score-cell.score-updated {
+      animation: countUp var(--transition-fast);
+      color: var(--accent-green);
+    }
+
+    /* Status Cell */
+    .status-cell {
+      display: flex;
+      justify-content: center;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--radius-sm);
+      background: var(--bg-tertiary);
+    }
+
+    .status-indicator.running {
+      color: #4ade80;
+      background: rgba(74, 222, 128, 0.2);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.4), 0 0 24px rgba(74, 222, 128, 0.2);
+    }
+
+    .status-indicator.running .status-dot {
+      background: #4ade80;
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.8), 0 0 16px rgba(74, 222, 128, 0.5);
+      animation: pulse 1s infinite;
+    }
+
+    /* Rank change indicators */
+    .rank-change {
+      font-size: 14px;
+      margin-left: var(--spacing-xs);
+    }
+
+    .rank-change.up {
+      color: var(--accent-green);
+    }
+
+    .rank-change.down {
+      color: var(--accent-red);
+    }
+
+    /* Empty state */
+    .scoreboard-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 22px;
+    }
+
+    /* Footer */
+    .scoreboard-footer {
+      padding: var(--spacing-lg) var(--spacing-xl);
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 18px;
+      color: var(--text-muted);
+    }
+
+  </style>
+</head>
+<body>
+  <div class="scoreboard-container">
+    <header class="scoreboard-header">
+      <div class="header-left">
+        <div class="scoreboard-title">M+ Tournament</div>
+        <div class="scoreboard-subtitle">Live Standings</div>
+      </div>
+    </header>
+
+    <div class="scoreboard-columns">
+      <div class="col-center">Rank</div>
+      <div>Team</div>
+      <div class="col-center">Bracket</div>
+      <div class="col-center">Highest Key</div>
+      <div class="col-center">Runs</div>
+      <div class="col-right">Score</div>
+      <div class="col-center">Status</div>
+    </div>
+
+    <div class="scoreboard-body" id="leaderboardBody">
+      <div class="scoreboard-empty">Connecting...</div>
+    </div>
+
+    <footer class="scoreboard-footer">
+      <span id="lastUpdate">Data Updated: --:--:--</span>
+    </footer>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script>
+    const client = initTournamentClient();
+    const leaderboardBody = document.getElementById('leaderboardBody');
+    const lastUpdateEl = document.getElementById('lastUpdate');
+
+    let previousRanks = {};
+    let teams = [];
+    let teamStats = {};
+    let cachedLeaderboard = [];
+    let activeRuns = [];
+
+    // Poll countdown
+    let pollCountdownInterval = null;
+    let nextPollTime = null;
+
+    client.on('connected', () => {
+      loadTeamStats();
+    });
+
+    client.on('state:sync', (state) => {
+      teams = state.teams || [];
+      activeRuns = state.activeRuns || [];
+      renderLeaderboard(state.leaderboard);
+      updateLastPoll(state.lastPollTime);
+      // Start countdown if we have poll info
+      if (state.lastPollTime && state.nextPollMs) {
+        const elapsed = Date.now() - state.lastPollTime;
+        const remaining = Math.max(0, state.nextPollMs - elapsed);
+        startPollCountdown(remaining);
+      }
+    });
+
+    client.on('teams:update', (newTeams) => {
+      teams = newTeams;
+      renderLeaderboard();
+    });
+
+    client.on('scoreboard:update', (leaderboard) => {
+      loadTeamStats();
+      renderLeaderboard(leaderboard);
+      updateLastPoll(Date.now());
+    });
+
+    client.on('activeRuns:update', (runs) => {
+      activeRuns = runs || [];
+      renderLeaderboard();
+    });
+
+    client.on('poll:complete', (data) => {
+      console.log('[Scoreboard] Poll complete received', data);
+      updateLastPoll(data.time);
+      startPollCountdown(data.nextPollMs || 30000);
+      // Flash the updated text to show refresh happened
+      lastUpdateEl.style.color = 'var(--accent-green)';
+      setTimeout(() => { lastUpdateEl.style.color = ''; }, 1000);
+      // Re-fetch full state to ensure overlay is up to date
+      refreshData();
+    });
+
+    async function loadTeamStats() {
+      try {
+        const res = await fetch('/api/team-stats');
+        teamStats = await res.json();
+        renderLeaderboard(cachedLeaderboard);
+      } catch (err) {
+        console.error('Failed to load team stats:', err);
+      }
+    }
+
+    function renderLeaderboard(leaderboard) {
+      if (leaderboard) {
+        cachedLeaderboard = leaderboard;
+      }
+
+      if (!cachedLeaderboard || cachedLeaderboard.length === 0) {
+        leaderboardBody.innerHTML = '<div class="scoreboard-empty">No teams registered</div>';
+        return;
+      }
+
+      const html = cachedLeaderboard.map((entry) => {
+        const prevRank = previousRanks[entry.teamName];
+        let rankChangeClass = '';
+        let rankChangeHtml = '';
+
+        if (prevRank !== undefined && prevRank !== entry.rank) {
+          if (entry.rank < prevRank) {
+            rankChangeClass = 'rank-changed';
+            rankChangeHtml = `<span class="rank-change up">&#9650;${prevRank - entry.rank}</span>`;
+          } else {
+            rankChangeClass = 'rank-changed';
+            rankChangeHtml = `<span class="rank-change down">&#9660;${entry.rank - prevRank}</span>`;
+          }
+        }
+
+        const statusClass = entry.status === 'running' ? 'running' : '';
+        const statusText = entry.status === 'running' ? 'LIVE' : 'Idle';
+        const podiumClass = entry.rank <= 3 ? `podium-${entry.rank}` : '';
+
+        // Get team bracket
+        const team = teams.find(t => t.name === entry.teamName);
+        const bracket = team?.bracket || 'A';
+
+        // Get team stats
+        const stats = teamStats[entry.teamName] || { highestKey: 0 };
+
+        // Medal for top 3
+        let medalHtml = '';
+        if (entry.rank === 1) medalHtml = '<span class="medal medal-gold">1</span>';
+        else if (entry.rank === 2) medalHtml = '<span class="medal medal-silver">2</span>';
+        else if (entry.rank === 3) medalHtml = '<span class="medal medal-bronze">3</span>';
+
+        return `
+          <div class="team-card ${podiumClass} ${rankChangeClass}" data-team="${escapeHtml(entry.teamName)}">
+            <div class="team-rank">
+              ${medalHtml || `<span class="rank-number">${entry.rank}</span>`}
+            </div>
+            <div class="team-info">
+              <div class="team-name">${escapeHtml(entry.teamName)}${rankChangeHtml}</div>
+            </div>
+            <div class="bracket-cell">
+              <span class="bracket-badge bracket-${bracket.toLowerCase()}">Bracket ${bracket}</span>
+            </div>
+            <div class="stat-cell highlight">+${stats.highestKey || 0}</div>
+            <div class="stat-cell">${entry.runs}</div>
+            <div class="score-cell">${formatNumber(entry.points)}</div>
+            <div class="status-cell">
+              <span class="status-indicator ${statusClass}">
+                <span class="status-dot"></span>
+                <span>${statusText}</span>
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      leaderboardBody.innerHTML = html;
+
+      // Store current ranks for next comparison
+      previousRanks = {};
+      for (const entry of cachedLeaderboard) {
+        previousRanks[entry.teamName] = entry.rank;
+      }
+    }
+
+    function updateLastPoll(time) {
+      if (!time) {
+        lastUpdateEl.textContent = 'Data Updated: --:--:--';
+        return;
+      }
+
+      const date = new Date(time);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      lastUpdateEl.textContent = `Data Updated: ${hours}:${minutes}:${seconds}`;
+    }
+
+    function formatNumber(num) {
+      return (num || 0).toLocaleString();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
+    function startPollCountdown(intervalMs) {
+      nextPollTime = Date.now() + intervalMs;
+
+      if (pollCountdownInterval) clearInterval(pollCountdownInterval);
+
+      function updateCountdown() {
+        const remaining = Math.max(0, nextPollTime - Date.now());
+
+        // Auto-refresh when countdown reaches 0
+        if (remaining <= 0) {
+          clearInterval(pollCountdownInterval);
+          refreshData();
+        }
+      }
+
+      updateCountdown();
+      pollCountdownInterval = setInterval(updateCountdown, 1000);
+    }
+
+    function refreshData() {
+      console.log('[Scoreboard] Auto-refreshing data...');
+      fetch('/api/state')
+        .then(res => res.json())
+        .then(state => {
+          teams = state.teams || [];
+          activeRuns = state.activeRuns || [];
+          cachedLeaderboard = state.leaderboard || [];
+          loadTeamStats();
+          renderLeaderboard(state.leaderboard);
+          updateLastPoll(state.lastPollTime);
+          // Flash to show refresh
+          lastUpdateEl.style.color = 'var(--accent-green)';
+          setTimeout(() => { lastUpdateEl.style.color = ''; }, 1000);
+          // Restart countdown based on state or default to 30s
+          const nextInterval = state.nextPollMs || 30000;
+          if (state.lastPollTime) {
+            const elapsed = Date.now() - state.lastPollTime;
+            const remaining = Math.max(5000, nextInterval - elapsed); // Min 5s to avoid rapid polling
+            startPollCountdown(remaining);
+          } else {
+            startPollCountdown(nextInterval);
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to refresh state:', err);
+          // Retry in 10 seconds on error
+          startPollCountdown(10000);
+        });
+    }
+  </script>
+</body>
+</html>

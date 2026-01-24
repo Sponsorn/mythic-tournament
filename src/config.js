@@ -55,9 +55,10 @@ const MPLUS_DEATH_PENALTY_GE12 = parseIntEnv('MPLUS_DEATH_PENALTY_GE12', 15, 0, 
 // Web Server Configuration
 const WEB_PORT = parseIntEnv('WEB_PORT', 3000, 1, 65535);
 const WEB_HOST = getStringEnv('WEB_HOST', '0.0.0.0');
-const RECAP_DURATION_MS = parseIntEnv('RECAP_DURATION_MS', 15000, 1000, 60000);
-const POLL_INTERVAL_ACTIVE_MS = parseIntEnv('POLL_INTERVAL_ACTIVE_MS', 30000, 10000, 300000);
+const POLL_INTERVAL_ACTIVE_MS = parseIntEnv('POLL_INTERVAL_ACTIVE_MS', 60000, 10000, 300000);
 const POLL_INTERVAL_IDLE_MS = parseIntEnv('POLL_INTERVAL_IDLE_MS', 300000, 60000, 600000);
+const CORS_ORIGINS = getStringEnv('CORS_ORIGINS'); // Comma-separated origins, empty = allow all
+const ADMIN_SECRET = getStringEnv('ADMIN_SECRET'); // Shared secret for admin socket auth, empty = no auth
 
 // Timezone Configuration
 const REALM_TZ = getStringEnv('REALM_TZ', 'Europe/Stockholm');
@@ -108,9 +109,10 @@ module.exports = {
   // Web Server
   WEB_PORT,
   WEB_HOST,
-  RECAP_DURATION_MS,
   POLL_INTERVAL_ACTIVE_MS,
   POLL_INTERVAL_IDLE_MS,
+  CORS_ORIGINS,
+  ADMIN_SECRET,
 
   // Timezones
   REALM_TZ,

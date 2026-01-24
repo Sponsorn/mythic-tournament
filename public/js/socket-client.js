@@ -7,6 +7,7 @@ class TournamentClient {
     this.connected = false;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = options.maxReconnectAttempts || 10;
+    this.authSecret = options.secret || null;
     this.listeners = {};
 
     this.connect();
@@ -14,12 +15,16 @@ class TournamentClient {
 
   connect() {
     // Connect to the server (same origin)
-    this.socket = io({
+    const ioOptions = {
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-    });
+    };
+    if (this.authSecret) {
+      ioOptions.auth = { secret: this.authSecret };
+    }
+    this.socket = io(ioOptions);
 
     this.socket.on('connect', () => {
       console.log('[Tournament] Connected to server');
@@ -74,11 +79,6 @@ class TournamentClient {
 
     this.socket.on('run:complete', (data) => {
       this.emit('run:complete', data);
-    });
-
-    // Recap show
-    this.socket.on('recap:show', (data) => {
-      this.emit('recap:show', data);
     });
 
     // Teams update
@@ -156,8 +156,16 @@ class TournamentClient {
     this.socket.emit('admin:tournament', { action: 'resume' });
   }
 
-  showRecap(runIndex, duration = 15000) {
-    this.socket.emit('admin:showRecap', { runIndex, duration });
+  toggleActiveRun(teamName, active) {
+    this.socket.emit('admin:toggleActiveRun', { teamName, active });
+  }
+
+  setRunDetails(teamName, dungeonName, keystoneLevel) {
+    this.socket.emit('admin:setRunDetails', { teamName, dungeonName, keystoneLevel });
+  }
+
+  clearActiveRun(teamName) {
+    this.socket.emit('admin:clearActiveRun', { teamName });
   }
 
   // Getters

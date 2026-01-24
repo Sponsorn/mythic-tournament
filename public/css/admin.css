@@ -1,5 +1,18 @@
 /* Admin Dashboard Styles */
 
+/* Dark blue theme matching scoreboard-fullscreen */
+:root {
+  --bg-primary: #0a1530;
+  --bg-secondary: #0c2448;
+  --bg-tertiary: #0e2a52;
+  --bg-hover: #102f5c;
+  --border-subtle: #1a3a6e;
+  --border-color: #1a3a6e;
+  --text-primary: #ffffff;
+  --text-secondary: #e0e8f0;
+  --text-muted: #a0b4d0;
+}
+
 body {
   background: var(--bg-primary);
   min-height: 100vh;
@@ -256,16 +269,85 @@ body {
   color: var(--text-muted);
 }
 
-.team-status-cell .status-indicator {
-  display: inline-flex;
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-tertiary);
+  transition: 0.3s;
+  border-radius: 22px;
+  border: 1px solid var(--border-color);
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--text-muted);
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(18px);
+  background-color: white;
+}
+
+/* Active cell layout */
+.team-active-cell {
+  min-width: 180px;
+}
+
+.active-toggle-row {
+  display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
+}
+
+.run-details-text {
   font-size: 12px;
+  color: var(--accent-green);
+  margin-left: var(--spacing-sm);
+  white-space: nowrap;
+}
+
+.run-details-pending {
+  font-size: 12px;
+  color: var(--accent-yellow);
+  margin-left: var(--spacing-sm);
+  white-space: nowrap;
 }
 
 .team-actions {
   display: flex;
   gap: var(--spacing-sm);
+  flex-wrap: wrap;
 }
 
 .btn-sm {
@@ -640,6 +722,12 @@ select.input {
   background: rgba(251, 191, 36, 0.2);
   color: var(--accent-yellow);
   border: 1px solid var(--accent-yellow);
+}
+
+.bracket-d {
+  background: rgba(168, 85, 247, 0.2);
+  color: #a855f7;
+  border: 1px solid #a855f7;
 }
 
 /* Responsive */

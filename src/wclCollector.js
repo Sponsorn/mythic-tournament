@@ -31,12 +31,17 @@ const { parseLocalDateTime, formatTimerMs } = require('./timeUtils');
  * @returns {{start: Date|null, end: Date|null}}
  */
 function parseEventWindow() {
-  const startIso = EVENT_START_SE ? parseLocalDateTime(EVENT_START_SE, REALM_TZ) : null;
-  const endIso = EVENT_END_SE ? parseLocalDateTime(EVENT_END_SE, REALM_TZ) : null;
-  return {
-    start: startIso ? new Date(startIso) : null,
-    end: endIso ? new Date(endIso) : null,
-  };
+  try {
+    const startIso = EVENT_START_SE ? parseLocalDateTime(EVENT_START_SE, REALM_TZ) : null;
+    const endIso = EVENT_END_SE ? parseLocalDateTime(EVENT_END_SE, REALM_TZ) : null;
+    return {
+      start: startIso ? new Date(startIso) : null,
+      end: endIso ? new Date(endIso) : null,
+    };
+  } catch (err) {
+    console.warn(`[WCL] Failed to parse event window: ${err.message || err}`);
+    return { start: null, end: null };
+  }
 }
 
 function collectCodes(team) {
@@ -119,9 +124,13 @@ async function collectRunsAndSync() {
           }
         }
 
-        const dedupe = `team:${teamName}:id:${fight.id}`;
+        // Dedupe by team + dungeon + level + end time (rounded to nearest minute)
+        // This prevents the same run from being imported multiple times if it appears
+        // in different WCL reports (e.g., primary and backup codes pointing to same runs)
+        const endMinute = Math.floor(enAbs / 60000);
+        const dedupe = `team:${teamName}:${fight.name}:${lvl}:${endMinute}`;
         if (seen.has(dedupe) || newSeen.has(dedupe)) {
-          privateMsgs.push(`[WCL Info] skip seen id=${fight.id}`);
+          privateMsgs.push(`[WCL Info] skip duplicate run: ${fight.name} +${lvl} (team=${teamName})`);
           continue;
         }
 
@@ -129,6 +138,7 @@ async function collectRunsAndSync() {
         try {
           deaths = await wclCountDeathsForFight(code, fight.id);
         } catch (err) {
+          console.warn(`[WCL] Failed to fetch death count for ${teamName} fight=${fight.id}: ${err.message || err}`);
           deaths = 0;
         }
 
@@ -137,6 +147,7 @@ async function collectRunsAndSync() {
         try {
           bossKills = await wclFetchBossKillTimes(code, fight.id, fight.startTime || 0);
         } catch (err) {
+          console.warn(`[WCL] Failed to fetch boss kills for ${teamName} fight=${fight.id}: ${err.message || err}`);
           bossKills = [];
         }
 

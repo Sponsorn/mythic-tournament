@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament - Countdown</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <style>
+    :root {
+      --bg-primary: #0a1530;
+      --bg-secondary: #0c2448;
+      --border-color: #1a3a6e;
+    }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    .canvas {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .countdown-box {
+      background: var(--bg-primary);
+      border: 5px solid #d4af37;
+      border-radius: 16px;
+      padding: 50px 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: var(--font-sans);
+      box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+    }
+
+    .logo {
+      width: 250px;
+      height: 250px;
+      margin-bottom: 30px;
+    }
+
+    .logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .title {
+      font-size: 42px;
+      font-weight: 700;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      font-size: 24px;
+      color: var(--text-muted);
+      margin-bottom: 40px;
+      letter-spacing: 1px;
+    }
+
+    .countdown {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    .countdown-unit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 100px;
+    }
+
+    .countdown-value {
+      font-family: var(--font-mono);
+      font-size: 72px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1;
+    }
+
+    .countdown-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-top: 8px;
+    }
+
+    .separator {
+      font-size: 60px;
+      color: var(--text-muted);
+      line-height: 1;
+      opacity: 0.5;
+    }
+
+    .start-date {
+      font-size: 20px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-bottom: 30px;
+    }
+
+    .infotext {
+      font-size: 18px;
+      color: #a0aec0;
+      text-align: center;
+      max-width: 500px;
+      line-height: 1.5;
+    }
+
+    .started {
+      font-size: 56px;
+      font-weight: 700;
+      color: var(--accent-green);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="countdown-box">
+      <div class="logo">
+        <img src="/images/luckywipelogo.png" alt="Tournament Logo">
+      </div>
+
+      <div class="title">Mythic+ Tournament</div>
+      <div class="subtitle">Tournament Starts In</div>
+
+      <div class="countdown" id="countdown">
+        <div class="countdown-unit">
+          <div class="countdown-value" id="days">00</div>
+          <div class="countdown-label">Days</div>
+        </div>
+        <div class="separator">:</div>
+        <div class="countdown-unit">
+          <div class="countdown-value" id="hours">00</div>
+          <div class="countdown-label">Hours</div>
+        </div>
+        <div class="separator">:</div>
+        <div class="countdown-unit">
+          <div class="countdown-value" id="minutes">00</div>
+          <div class="countdown-label">Minutes</div>
+        </div>
+        <div class="separator">:</div>
+        <div class="countdown-unit">
+          <div class="countdown-value" id="seconds">00</div>
+          <div class="countdown-label">Seconds</div>
+        </div>
+      </div>
+
+      <div class="start-date">January 31st, 2026 - 18:00 CET</div>
+
+      <div class="infotext">
+        Lucky Wipe is organizing a Mythic+ Tournament for <br>guild members and friends of the guild.<br><br> Commands you can write in chat to get more info: <br>!tournament, !guild, !join
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Read start date from URL parameter (?start=2026-01-31T18:00:00+01:00) or use default
+    const urlParams = new URLSearchParams(window.location.search);
+    const startParam = urlParams.get('start');
+    let tournamentStart = startParam ? new Date(startParam) : new Date('2026-01-31T18:00:00+01:00');
+    if (isNaN(tournamentStart.getTime())) {
+      console.warn('Invalid start date parameter, using default');
+      tournamentStart = new Date('2026-01-31T18:00:00+01:00');
+    }
+
+    const daysEl = document.getElementById('days');
+    const hoursEl = document.getElementById('hours');
+    const minutesEl = document.getElementById('minutes');
+    const secondsEl = document.getElementById('seconds');
+    const countdownEl = document.getElementById('countdown');
+    const subtitleEl = document.querySelector('.subtitle');
+
+    function updateCountdown() {
+      const now = new Date();
+      const diff = tournamentStart - now;
+
+      if (diff <= 0) {
+        // Tournament has started
+        subtitleEl.textContent = '';
+        countdownEl.innerHTML = '<div class="started">Tournament Live!</div>';
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      daysEl.textContent = days.toString().padStart(2, '0');
+      hoursEl.textContent = hours.toString().padStart(2, '0');
+      minutesEl.textContent = minutes.toString().padStart(2, '0');
+      secondsEl.textContent = seconds.toString().padStart(2, '0');
+    }
+
+    // Update immediately and then every second
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+  </script>
+</body>
+</html>

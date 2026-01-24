@@ -7,10 +7,60 @@
   <link rel="stylesheet" href="/css/common.css">
   <link rel="stylesheet" href="/css/admin.css">
   <style>
+    .public-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      font-family: var(--font-sans);
+    }
+
+    .public-header {
+      text-align: center;
+      margin-bottom: var(--spacing-xl);
+      padding-bottom: var(--spacing-lg);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .public-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .public-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .last-updated {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: var(--spacing-sm);
+      font-family: var(--font-mono);
+    }
+
+    .next-update {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: var(--spacing-xs);
+      font-family: var(--font-mono);
+    }
+
+    .logo-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: var(--spacing-md);
+    }
+
+    .logo-container img {
+      max-width: 120px;
+      max-height: 120px;
+    }
+
     /* Column Headers */
     .lb-columns {
       display: grid;
-      grid-template-columns: 50px 1fr 90px 100px 80px 80px 100px 80px;
+      grid-template-columns: 50px 1fr 90px 100px 80px 100px 80px;
       gap: var(--spacing-sm);
       padding: var(--spacing-sm) var(--spacing-lg);
       background: var(--bg-tertiary);
@@ -20,6 +70,7 @@
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      margin-bottom: var(--spacing-sm);
     }
 
     .col-center { text-align: center; }
@@ -35,7 +86,7 @@
     /* Team Card */
     .team-card {
       display: grid;
-      grid-template-columns: 50px 1fr 90px 100px 80px 80px 100px 80px;
+      grid-template-columns: 50px 1fr 90px 100px 80px 100px 80px;
       gap: var(--spacing-sm);
       padding: var(--spacing-md) var(--spacing-lg);
       background: var(--bg-secondary);
@@ -146,11 +197,6 @@
       color: var(--text-primary);
     }
 
-    .stat-cell.deaths.zero {
-      color: var(--text-muted);
-      opacity: 0.5;
-    }
-
     /* Score */
     .score-cell {
       font-family: var(--font-mono);
@@ -207,116 +253,69 @@
   </style>
 </head>
 <body>
-  <div class="admin-container">
-    <header class="admin-header">
-      <div>
-        <h1 class="admin-title">Tournament Leaderboard</h1>
-        <p class="admin-subtitle">Live standings and scores</p>
+  <div class="public-container">
+    <header class="public-header">
+      <div class="logo-container">
+        <img src="/images/luckywipelogo.png" alt="Tournament Logo">
       </div>
-      <div class="connection-badge" id="connectionBadge">
-        <span class="status-dot"></span>
-        <span id="connectionText">Connecting...</span>
-      </div>
+      <h1 class="public-title">M+ Tournament Leaderboard</h1>
+      <p class="public-subtitle">Live standings updated automatically</p>
+      <div class="last-updated" id="lastUpdated">Last updated: --:--</div>
+      <div class="next-update" id="nextUpdate">Next update in: --:--</div>
     </header>
 
-    <!-- Navigation -->
-    <nav class="admin-nav">
-      <a href="/admin/" class="nav-link">Dashboard</a>
-      <a href="/admin/leaderboard.html" class="nav-link active">Leaderboard</a>
-      <a href="/admin/best-times.html" class="nav-link">Best Times</a>
-      <a href="/admin/links.html" class="nav-link">Links</a>
-    </nav>
-
-    <!-- Leaderboard -->
-    <div class="leaderboard-section">
-      <div class="leaderboard-header">
-        <h2 class="section-title" style="margin: 0;">Leaderboard</h2>
-        <span class="last-update" id="lastUpdate">--</span>
-      </div>
-      <div class="lb-columns">
-        <div class="col-center">Rank</div>
-        <div>Team</div>
-        <div class="col-center">Bracket</div>
-        <div class="col-center">Highest Key</div>
-        <div class="col-center">Runs</div>
-        <div class="col-center">Unique Dungeons</div>
-        <div class="col-right">Score</div>
-        <div class="col-center">Status</div>
-      </div>
-      <div class="lb-body" id="leaderboardBody">
-        <div class="lb-empty">Loading...</div>
-      </div>
+    <div class="lb-columns">
+      <div class="col-center">Rank</div>
+      <div>Team</div>
+      <div class="col-center">Bracket</div>
+      <div class="col-center">Highest Key</div>
+      <div class="col-center">Runs</div>
+      <div class="col-right">Score</div>
+      <div class="col-center">Status</div>
     </div>
-
-    <!-- Recent Runs -->
-    <div class="recent-section">
-      <div class="recent-header">
-        <h2 class="section-title" style="margin: 0;">Recent Completed Runs</h2>
-      </div>
-      <div class="recent-list" id="recentList">
-        <div class="recent-item" style="justify-content: center; color: var(--text-muted);">
-          No completed runs yet
-        </div>
-      </div>
+    <div class="lb-body" id="leaderboardBody">
+      <div class="lb-empty">Connecting...</div>
     </div>
   </div>
-
-  <!-- Toast Container -->
-  <div class="toast-container" id="toastContainer"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/socket-client.js"></script>
   <script>
     const client = initTournamentClient();
-
-    // DOM Elements
-    const connectionBadge = document.getElementById('connectionBadge');
-    const connectionText = document.getElementById('connectionText');
     const leaderboardBody = document.getElementById('leaderboardBody');
-    const lastUpdate = document.getElementById('lastUpdate');
-    const recentList = document.getElementById('recentList');
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+    const nextUpdateEl = document.getElementById('nextUpdate');
 
-    // State
     let teams = [];
     let leaderboard = [];
     let activeRuns = [];
     let teamStats = {};
-    let recentRuns = [];
+    let pollCountdownInterval = null;
+    let nextPollTime = null;
 
-    // Connection events
-    client.on('connected', () => {
-      connectionBadge.classList.add('connected');
-      connectionBadge.classList.remove('disconnected');
-      connectionText.textContent = 'Connected';
-      loadTeamStats();
-    });
-
-    client.on('disconnected', () => {
-      connectionBadge.classList.add('disconnected');
-      connectionBadge.classList.remove('connected');
-      connectionText.textContent = 'Disconnected';
-    });
-
-    // State sync
     client.on('state:sync', (state) => {
       teams = state.teams || [];
       leaderboard = state.leaderboard || [];
       activeRuns = state.activeRuns || [];
-      recentRuns = state.recentRuns || [];
       loadTeamStats();
-      renderRecentRuns();
-      updateLastPoll(state.lastPollTime);
+      updateLastUpdated(state.lastPollTime);
+      // Start countdown if we have poll info
+      if (state.lastPollTime && state.nextPollMs) {
+        const elapsed = Date.now() - state.lastPollTime;
+        const remaining = Math.max(0, state.nextPollMs - elapsed);
+        startPollCountdown(remaining);
+      }
     });
 
     client.on('teams:update', (newTeams) => {
-      teams = newTeams || [];
+      teams = newTeams;
       renderLeaderboard();
     });
 
     client.on('scoreboard:update', (newLeaderboard) => {
       leaderboard = newLeaderboard;
       loadTeamStats();
-      updateLastPoll(Date.now());
+      updateLastUpdated(Date.now());
     });
 
     client.on('activeRuns:update', (runs) => {
@@ -324,10 +323,10 @@
       renderLeaderboard();
     });
 
-    client.on('run:complete', (data) => {
-      recentRuns.unshift(data.recap);
-      if (recentRuns.length > 10) recentRuns = recentRuns.slice(0, 10);
-      renderRecentRuns();
+    client.on('poll:complete', (data) => {
+      updateLastUpdated(data.time);
+      startPollCountdown(data.nextPollMs || 30000);
+      refreshData();
     });
 
     async function loadTeamStats() {
@@ -341,28 +340,19 @@
       }
     }
 
-    function updateLastPoll(time) {
-      if (!time) {
-        lastUpdate.textContent = '--';
-        return;
-      }
-      const date = new Date(time);
-      lastUpdate.textContent = `Updated: ${date.toLocaleTimeString()}`;
-    }
-
     function renderLeaderboard() {
       if (!leaderboard.length) {
-        leaderboardBody.innerHTML = '<div class="lb-empty">No scores yet</div>';
+        leaderboardBody.innerHTML = '<div class="lb-empty">No teams registered</div>';
         return;
       }
 
-      const html = leaderboard.map((entry) => {
+      const html = leaderboard.map(entry => {
+        const team = teams.find(t => t.name === entry.teamName);
+        const bracket = team?.bracket || 'A';
+        const stats = teamStats[entry.teamName] || { highestKey: 0 };
         const isActive = activeRuns.some(r => r.teamName === entry.teamName);
         const statusClass = isActive ? 'running' : '';
         const statusText = isActive ? 'LIVE' : 'Idle';
-        const stats = teamStats[entry.teamName] || { highestKey: 0, uniqueDungeons: 0 };
-        const team = teams.find(t => t.name === entry.teamName);
-        const bracket = team?.bracket || 'A';
         const podiumClass = entry.rank <= 3 ? `podium-${entry.rank}` : '';
 
         // Rank display: medal for top 3, number for others
@@ -388,8 +378,7 @@
             </div>
             <div class="stat-cell highlight">+${stats.highestKey || 0}</div>
             <div class="stat-cell">${entry.runs}</div>
-            <div class="stat-cell">${stats.uniqueDungeons || 0}</div>
-            <div class="score-cell">${entry.points.toLocaleString()}</div>
+            <div class="score-cell">${formatNumber(entry.points)}</div>
             <div class="status-cell">
               <span class="status-indicator ${statusClass}">
                 <span class="status-dot"></span>
@@ -403,36 +392,47 @@
       leaderboardBody.innerHTML = html;
     }
 
-    function renderRecentRuns() {
-      if (!recentRuns.length) {
-        recentList.innerHTML = '<div class="recent-item" style="justify-content: center; color: var(--text-muted);">No completed runs yet</div>';
+    function updateLastUpdated(time) {
+      if (!time) {
+        lastUpdatedEl.textContent = 'Last updated: --:--';
         return;
       }
-
-      const html = recentRuns.map((run, index) => {
-        return `
-          <div class="recent-item">
-            <div class="recent-info">
-              <div class="recent-team">${escapeHtml(run.teamName)}</div>
-              <div class="recent-dungeon">${escapeHtml(run.dungeonName)} +${run.keystoneLevel}</div>
-              <div class="recent-details">
-                ${formatTime(run.duration)} | ${run.deaths} deaths | ${run.timed ? 'Timed' : 'Depleted'}
-              </div>
-            </div>
-            <div class="recent-points">${run.points}</div>
-          </div>
-        `;
-      }).join('');
-
-      recentList.innerHTML = html;
+      const date = new Date(time);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      lastUpdatedEl.textContent = `Last updated: ${hours}:${minutes}:${seconds}`;
     }
 
-    function formatTime(ms) {
-      if (!ms || ms < 0) return '00:00';
-      const totalSeconds = Math.floor(ms / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    function refreshData() {
+      fetch('/api/state')
+        .then(res => res.json())
+        .then(state => {
+          teams = state.teams || [];
+          leaderboard = state.leaderboard || [];
+          activeRuns = state.activeRuns || [];
+          loadTeamStats();
+          updateLastUpdated(state.lastPollTime);
+          // Restart countdown only if server has a future poll scheduled
+          if (state.lastPollTime && state.nextPollMs) {
+            const elapsed = Date.now() - state.lastPollTime;
+            const remaining = state.nextPollMs - elapsed;
+            if (remaining > 0) {
+              startPollCountdown(remaining);
+            } else {
+              // Server hasn't polled yet, silently retry
+              setTimeout(refreshData, 5000);
+            }
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to refresh:', err);
+          setTimeout(refreshData, 5000);
+        });
+    }
+
+    function formatNumber(num) {
+      return (num || 0).toLocaleString();
     }
 
     function escapeHtml(text) {
@@ -441,6 +441,31 @@
       return div.innerHTML;
     }
 
+    function startPollCountdown(intervalMs) {
+      nextPollTime = Date.now() + intervalMs;
+
+      if (pollCountdownInterval) clearInterval(pollCountdownInterval);
+
+      function updateCountdown() {
+        const remaining = Math.max(0, nextPollTime - Date.now());
+
+        if (remaining <= 0) {
+          clearInterval(pollCountdownInterval);
+          pollCountdownInterval = null;
+          nextUpdateEl.textContent = 'Updating...';
+          refreshData();
+          return;
+        }
+
+        const seconds = Math.ceil(remaining / 1000);
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        nextUpdateEl.textContent = `Next update in: ${mins}:${secs.toString().padStart(2, '0')}`;
+      }
+
+      updateCountdown();
+      pollCountdownInterval = setInterval(updateCountdown, 1000);
+    }
   </script>
 </body>
 </html>

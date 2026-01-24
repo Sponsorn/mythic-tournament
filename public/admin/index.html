@@ -25,6 +25,7 @@
       <a href="/admin/" class="nav-link active">Dashboard</a>
       <a href="/admin/leaderboard.html" class="nav-link">Leaderboard</a>
       <a href="/admin/best-times.html" class="nav-link">Best Times</a>
+      <a href="/admin/links.html" class="nav-link">Links</a>
     </nav>
 
     <!-- Status Cards -->
@@ -68,9 +69,8 @@
             <th>#</th>
             <th>Team Name</th>
             <th>Bracket</th>
-            <th>Report Code</th>
-            <th>Status</th>
             <th>Score</th>
+            <th>Active</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -117,6 +117,7 @@
             <option value="A">Bracket A</option>
             <option value="B">Bracket B</option>
             <option value="C">Bracket C</option>
+            <option value="D">Bracket D</option>
           </select>
         </div>
         <div class="form-group">
@@ -135,13 +136,45 @@
     </div>
   </div>
 
+  <!-- Run Details Modal -->
+  <div class="modal-overlay" id="runDetailsModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Run Details</h3>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="runDetailsTeamName">
+        <div class="form-group">
+          <label class="form-label">Team</label>
+          <div class="input" id="runDetailsTeamDisplay" style="background: var(--bg-secondary); cursor: default;"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dungeon</label>
+          <select class="input" id="runDetailsDungeon">
+            <option value="">Loading dungeons...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Key Level</label>
+          <input type="number" class="input" id="runDetailsKeyLevel" value="15" min="2" max="40">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelRunDetailsBtn">Cancel</button>
+        <button class="btn btn-success" id="saveRunDetailsBtn">Save Details</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/utils.js"></script>
   <script src="/js/socket-client.js"></script>
   <script>
-    const client = initTournamentClient();
+    const adminSecret = new URLSearchParams(window.location.search).get('secret') || '';
+    const client = new TournamentClient({ secret: adminSecret });
 
     // DOM Elements
     const connectionBadge = document.getElementById('connectionBadge');
@@ -160,6 +193,8 @@
     let teams = [];
     let leaderboard = [];
     let recentRuns = [];
+    let activeRuns = [];
+    let dungeonList = [];
 
     // Connection events
     client.on('connected', () => {
@@ -179,10 +214,18 @@
       teams = state.teams || [];
       leaderboard = state.leaderboard || [];
       recentRuns = state.recentRuns || [];
+      activeRuns = state.activeRuns || [];
 
       updateStatusCards(state);
       renderTeams();
       renderRecentRuns();
+      loadDungeonList();
+    });
+
+    client.on('activeRuns:update', (newActiveRuns) => {
+      activeRuns = newActiveRuns;
+      activeCount.textContent = activeRuns.length;
+      renderTeams();
     });
 
     client.on('teams:update', (newTeams) => {
@@ -234,34 +277,47 @@
 
     function renderTeams() {
       if (!teams.length) {
-        teamsBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No teams registered</td></tr>';
+        teamsBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No teams registered</td></tr>';
         return;
       }
 
       const html = teams.map(team => {
         const entry = leaderboard.find(e => e.teamName === team.name);
         const score = entry?.points || 0;
-        const status = entry?.status || team.status || 'idle';
-        const statusClass = status === 'running' ? 'running' : '';
-        const code = extractCode(team.wclUrl);
+        const activeRun = activeRuns.find(r => r.teamName === team.name);
+        const isRunning = !!activeRun;
         const bracket = team.bracket || 'A';
+        const hasDungeonDetails = activeRun && activeRun.dungeonName;
+
+        // Run info display (inline after Details button)
+        let runStatusText = '';
+        if (isRunning) {
+          if (hasDungeonDetails) {
+            runStatusText = `<span class="run-details-text">${escapeHtml(activeRun.dungeonName)} +${activeRun.keystoneLevel}</span>`;
+          } else {
+            runStatusText = `<span class="run-details-pending">Waiting for details</span>`;
+          }
+        }
 
         return `
           <tr data-team="${escapeHtml(team.name)}">
             <td class="team-number">${team.id || '-'}</td>
             <td class="team-name-cell">${escapeHtml(team.name)}</td>
             <td class="team-bracket"><span class="bracket-badge bracket-${bracket.toLowerCase()}">${bracket}</span></td>
-            <td class="team-code">${code || '<span style="color: var(--accent-yellow);">Not set</span>'}</td>
-            <td class="team-status-cell">
-              <span class="status-indicator ${statusClass}">
-                <span class="status-dot"></span>
-                ${status === 'running' ? 'Running' : 'Idle'}
-              </span>
-            </td>
             <td style="font-family: var(--font-mono);">${score.toLocaleString()}</td>
+            <td class="team-active-cell">
+              <div class="active-toggle-row">
+                <label class="toggle-switch">
+                  <input type="checkbox" ${isRunning ? 'checked' : ''} data-action="toggleActive" data-team="${escapeHtml(team.name)}">
+                  <span class="toggle-slider"></span>
+                </label>
+                <button class="btn btn-secondary btn-sm" data-action="runDetails" data-team="${escapeHtml(team.name)}" ${!isRunning ? 'disabled' : ''}>Details</button>
+                ${runStatusText}
+              </div>
+            </td>
             <td class="team-actions">
-              <button class="btn btn-secondary btn-sm" onclick="editTeam('${escapeHtml(team.name)}')">Edit</button>
-              <button class="btn btn-primary btn-sm" onclick="refreshTeam('${escapeHtml(team.name)}')">Refresh</button>
+              <button class="btn btn-secondary btn-sm" data-action="edit" data-team="${escapeHtml(team.name)}">Edit</button>
+              <button class="btn btn-primary btn-sm" data-action="refresh" data-team="${escapeHtml(team.name)}">Refresh</button>
             </td>
           </tr>
         `;
@@ -287,10 +343,7 @@
                 ${formatTime(run.duration)} | ${run.deaths} deaths | ${run.timed ? 'Timed' : 'Depleted'}
               </div>
             </div>
-            <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-              <div class="recent-points">${run.points}</div>
-              <button class="btn btn-secondary btn-sm" onclick="showRecap(${index})">Show Recap</button>
-            </div>
+            <div class="recent-points">${run.points}</div>
           </div>
         `;
       }).join('');
@@ -361,10 +414,6 @@
       client.forceRefresh(teamName);
     }
 
-    function showRecap(index) {
-      client.showRecap(index, 15000);
-    }
-
     // Toast notifications
     function showToast(message, type = 'success') {
       const toast = document.createElement('div');
@@ -385,24 +434,123 @@
       return match ? match[1] : url.substring(0, 16);
     }
 
-    function formatTime(ms) {
-      if (!ms || ms < 0) return '00:00';
-      const totalSeconds = Math.floor(ms / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+    // Run Details modal elements
+    const runDetailsModal = document.getElementById('runDetailsModal');
+    const runDetailsTeamName = document.getElementById('runDetailsTeamName');
+    const runDetailsTeamDisplay = document.getElementById('runDetailsTeamDisplay');
+    const runDetailsDungeon = document.getElementById('runDetailsDungeon');
+    const runDetailsKeyLevel = document.getElementById('runDetailsKeyLevel');
+
+    // Load dungeon list from API
+    async function loadDungeonList() {
+      if (dungeonList.length > 0) return; // Already loaded
+
+      try {
+        const response = await fetch('/api/dungeon-pars');
+        const pars = await response.json();
+        dungeonList = Object.keys(pars).map(slug => ({
+          slug,
+          name: slug.split('-').map(word =>
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' ')
+        }));
+
+        // Populate dropdown
+        runDetailsDungeon.innerHTML = dungeonList.map(d =>
+          `<option value="${d.slug}">${d.name}</option>`
+        ).join('');
+      } catch (err) {
+        console.error('Failed to load dungeon list:', err);
+        runDetailsDungeon.innerHTML = '<option value="">Error loading dungeons</option>';
+      }
     }
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text || '';
-      return div.innerHTML;
+    // Toggle active state
+    function toggleActive(teamName, active) {
+      client.toggleActiveRun(teamName, active);
     }
 
-    // Make functions available globally
-    window.editTeam = editTeam;
-    window.refreshTeam = refreshTeam;
-    window.showRecap = showRecap;
+    // Open Run Details modal
+    function openRunDetailsModal(teamName) {
+      const activeRun = activeRuns.find(r => r.teamName === teamName);
+      if (!activeRun) {
+        showToast('Team must be active first', 'error');
+        return;
+      }
+
+      runDetailsTeamName.value = teamName;
+      runDetailsTeamDisplay.textContent = teamName;
+      runDetailsKeyLevel.value = activeRun.keystoneLevel || 15;
+
+      // Select current dungeon if set
+      if (activeRun.dungeonName && dungeonList.length > 0) {
+        const slug = activeRun.dungeonName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const option = Array.from(runDetailsDungeon.options).find(o => o.value === slug);
+        if (option) {
+          runDetailsDungeon.value = slug;
+        } else {
+          runDetailsDungeon.selectedIndex = 0;
+        }
+      } else if (dungeonList.length > 0) {
+        runDetailsDungeon.selectedIndex = 0;
+      }
+
+      runDetailsModal.classList.add('visible');
+    }
+
+    // Run Details modal event listeners
+    document.getElementById('cancelRunDetailsBtn').addEventListener('click', () => {
+      runDetailsModal.classList.remove('visible');
+    });
+
+    document.getElementById('saveRunDetailsBtn').addEventListener('click', () => {
+      const teamName = runDetailsTeamName.value;
+      const dungeonSlug = runDetailsDungeon.value;
+      const dungeonName = dungeonList.find(d => d.slug === dungeonSlug)?.name || dungeonSlug;
+      const keyLevel = parseInt(runDetailsKeyLevel.value) || 15;
+
+      if (!teamName || !dungeonSlug) {
+        showToast('Please select a dungeon', 'error');
+        return;
+      }
+
+      client.setRunDetails(teamName, dungeonName, keyLevel);
+      runDetailsModal.classList.remove('visible');
+    });
+
+    // Click outside modal to close
+    runDetailsModal.addEventListener('click', (e) => {
+      if (e.target === runDetailsModal) {
+        runDetailsModal.classList.remove('visible');
+      }
+    });
+
+    // Event delegation for teams table and recent runs
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const teamName = btn.dataset.team;
+
+      switch (action) {
+        case 'edit':
+          editTeam(teamName);
+          break;
+        case 'refresh':
+          refreshTeam(teamName);
+          break;
+        case 'runDetails':
+          openRunDetailsModal(teamName);
+          break;
+      }
+    });
+
+    document.addEventListener('change', (e) => {
+      const input = e.target.closest('[data-action="toggleActive"]');
+      if (!input) return;
+      toggleActive(input.dataset.team, input.checked);
+    });
   </script>
 </body>
 </html>

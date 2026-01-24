@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament - Links</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <style>
+    .links-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-md);
+    }
+
+    .link-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: var(--spacing-lg);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .link-card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .link-card-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .link-card-url {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent-blue);
+      word-break: break-all;
+      text-decoration: none;
+    }
+
+    .link-card-url:hover {
+      text-decoration: underline;
+    }
+
+    .link-card-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-sm);
+    }
+
+    .link-section {
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .link-section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: var(--spacing-sm);
+      padding-bottom: var(--spacing-sm);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <header class="admin-header">
+      <div>
+        <h1 class="admin-title">M+ Tournament Links</h1>
+        <p class="admin-subtitle">All overlay and page URLs for OBS and browser</p>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="admin-nav">
+      <a href="/admin/" class="nav-link">Dashboard</a>
+      <a href="/admin/leaderboard.html" class="nav-link">Leaderboard</a>
+      <a href="/admin/best-times.html" class="nav-link">Best Times</a>
+      <a href="/admin/links.html" class="nav-link active">Links</a>
+    </nav>
+
+    <!-- Base URL override -->
+    <div class="link-section">
+      <div class="link-section-title">Base URL</div>
+      <div style="display: flex; gap: var(--spacing-sm); align-items: center;">
+        <input type="text" class="input" id="baseUrlInput" placeholder="e.g. https://abc123.ngrok-free.app" style="flex: 1; max-width: 500px;">
+        <button class="btn btn-primary btn-sm" id="setBaseUrlBtn">Set</button>
+        <button class="btn btn-secondary btn-sm" id="resetBaseUrlBtn">Reset to localhost</button>
+      </div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+        Paste your ngrok URL here to update all links. Saved in browser storage.
+      </div>
+    </div>
+
+    <!-- OBS Overlays -->
+    <div class="link-section">
+      <div class="link-section-title">OBS Browser Source Overlays</div>
+      <div class="links-grid" id="overlayLinks">
+      </div>
+    </div>
+
+    <!-- Public Pages -->
+    <div class="link-section">
+      <div class="link-section-title">Public Pages</div>
+      <div class="links-grid" id="publicLinks">
+      </div>
+    </div>
+
+    <!-- Admin Pages -->
+    <div class="link-section">
+      <div class="link-section-title">Admin Pages</div>
+      <div class="links-grid" id="adminLinks">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const localUrl = window.location.origin;
+    let baseUrl = localStorage.getItem('tournamentBaseUrl') || localUrl;
+
+    const baseUrlInput = document.getElementById('baseUrlInput');
+    baseUrlInput.value = baseUrl !== localUrl ? baseUrl : '';
+
+    document.getElementById('setBaseUrlBtn').addEventListener('click', () => {
+      const val = baseUrlInput.value.trim().replace(/\/+$/, '');
+      if (val) {
+        baseUrl = val;
+        localStorage.setItem('tournamentBaseUrl', val);
+      } else {
+        baseUrl = localUrl;
+        localStorage.removeItem('tournamentBaseUrl');
+      }
+      renderAll();
+    });
+
+    document.getElementById('resetBaseUrlBtn').addEventListener('click', () => {
+      baseUrl = localUrl;
+      baseUrlInput.value = '';
+      localStorage.removeItem('tournamentBaseUrl');
+      renderAll();
+    });
+
+    const overlays = [
+      { title: 'Stream Overlay', path: '/overlays/stream-overlay.html', desc: 'Top bar overlay with leaderboard and team status (1920x300)', width: 1920, height: 300 },
+      { title: 'Scoreboard Fullscreen', path: '/overlays/scoreboard-fullscreen.html', desc: 'Full-screen scoreboard display' },
+      { title: 'Countdown', path: '/overlays/countdown.html', desc: 'Tournament start countdown timer. Use ?start= to set date (1920x1080)', width: 1920, height: 1080 },
+      { title: 'Infobox Overlay', path: '/overlays/infobox-overlay.html', desc: 'Information box overlay' },
+    ];
+
+    const publicPages = [
+      { title: 'Leaderboard', path: '/leaderboard.html', desc: 'Public leaderboard page' },
+    ];
+
+    const adminPages = [
+      { title: 'Dashboard', path: '/admin/', desc: 'Team management, run control, tournament actions' },
+      { title: 'Leaderboard', path: '/admin/leaderboard.html', desc: 'Detailed leaderboard with stats' },
+      { title: 'Best Times', path: '/admin/best-times.html', desc: 'Best run times per dungeon' },
+    ];
+
+    function renderLinks(containerId, links) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = links.map(link => {
+        const fullUrl = baseUrl + link.path;
+        const sizeInfo = link.width ? ` (${link.width}x${link.height})` : '';
+        return `
+          <div class="link-card">
+            <div class="link-card-title">${link.title}</div>
+            <div class="link-card-desc">${link.desc}</div>
+            <a class="link-card-url" href="${fullUrl}" target="_blank">${fullUrl}</a>
+            <div class="link-card-actions">
+              <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${fullUrl}')">Copy URL</button>
+              <button class="btn btn-primary btn-sm" onclick="window.open('${fullUrl}', '_blank')">Open</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('URL copied to clipboard');
+      }).catch(() => {
+        // Fallback
+        const input = document.createElement('input');
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        showToast('URL copied to clipboard');
+      });
+    }
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--bg-secondary);border:1px solid var(--accent-green);color:var(--text-primary);padding:12px 20px;border-radius:8px;font-size:14px;z-index:9999;';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 2000);
+    }
+
+    function renderAll() {
+      renderLinks('overlayLinks', overlays);
+      renderLinks('publicLinks', publicPages);
+      renderLinks('adminLinks', adminPages);
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>

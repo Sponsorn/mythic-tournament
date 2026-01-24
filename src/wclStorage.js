@@ -30,6 +30,9 @@ const SCORE_HEADER = [
 ];
 
 let cache = null;
+let saving = false;
+
+const VALID_BRACKETS = ['A', 'B', 'C', 'D'];
 
 function ensureTeamDefaults(team) {
   const bracket = String(team?.bracket || 'A').toUpperCase();
@@ -39,7 +42,7 @@ function ensureTeamDefaults(team) {
     wcl_url: team?.wcl_url || '',
     wcl_backup_url: team?.wcl_backup_url || '',
     team_number: Number.isFinite(Number(team?.team_number)) ? Number(team.team_number) : null,
-    bracket: ['A', 'B', 'C'].includes(bracket) ? bracket : 'A',
+    bracket: VALID_BRACKETS.includes(bracket) ? bracket : 'A',
   };
 }
 
@@ -75,7 +78,16 @@ function loadData() {
 
 function saveData() {
   if (!cache) return;
-  fs.writeFileSync(WCL_JSON, JSON.stringify(cache, null, 2), 'utf8');
+  if (saving) {
+    console.warn('[Storage] Re-entrant write detected, skipping');
+    return;
+  }
+  saving = true;
+  try {
+    fs.writeFileSync(WCL_JSON, JSON.stringify(cache, null, 2), 'utf8');
+  } finally {
+    saving = false;
+  }
 }
 
 function reloadData() {
@@ -147,7 +159,7 @@ function updateTeam({ teamName, teamNumber, leaderName, wclUrl, wclBackupUrl, br
   target.wcl_backup_url = wclBackupUrl ?? target.wcl_backup_url;
   if (bracket !== undefined) {
     const bracketUpper = String(bracket || 'A').toUpperCase();
-    target.bracket = ['A', 'B', 'C'].includes(bracketUpper) ? bracketUpper : target.bracket;
+    target.bracket = VALID_BRACKETS.includes(bracketUpper) ? bracketUpper : target.bracket;
   }
   saveData();
   return { status: 'updated', team: target };
@@ -267,7 +279,11 @@ function updateWclMeta(team, tsIso) {
 }
 
 function csvEscape(value) {
-  const str = String(value ?? '');
+  let str = String(value ?? '');
+  // Prevent CSV formula injection
+  if (/^[=+\-@]/.test(str)) {
+    str = "'" + str;
+  }
   if (str.includes('"') || str.includes(',') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`;
   }

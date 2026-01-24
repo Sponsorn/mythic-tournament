@@ -64,9 +64,23 @@ async function retryWithBackoff(fn, options = {}) {
  * @returns {Promise<Response>}
  */
 async function fetchWithRetry(url, options = {}, retryOptions = {}) {
+  const timeoutMs = retryOptions.timeout || 30000;
+
   return retryWithBackoff(
     async () => {
-      const response = await fetch(url, options);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      let response;
+      try {
+        response = await fetch(url, { ...options, signal: controller.signal });
+      } catch (err) {
+        clearTimeout(timer);
+        if (err.name === 'AbortError') {
+          throw new Error(`Request timed out after ${timeoutMs}ms: ${url}`);
+        }
+        throw err;
+      }
+      clearTimeout(timer);
 
       // Don't retry client errors (4xx), only server errors (5xx) and network errors
       if (!response.ok && response.status >= 400 && response.status < 500) {

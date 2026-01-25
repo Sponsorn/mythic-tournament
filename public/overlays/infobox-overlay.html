@@ -6,18 +6,6 @@
   <title>M+ Tournament - Info Box</title>
   <link rel="stylesheet" href="/css/common.css">
   <style>
-    /* Custom color theme */
-    :root {
-      --bg-primary: #0a1530;
-      --bg-secondary: #0c2448;
-      --bg-tertiary: #0e2a52;
-      --bg-hover: #102f5c;
-      --border-subtle: #1a3a6e;
-      --text-primary: #ffffff;
-      --text-secondary: #e0e8f0;
-      --text-muted: #a0b4d0;
-    }
-
     html, body {
       width: 100%;
       height: 100%;
@@ -86,7 +74,7 @@
 
     .info-value.highlight {
       color: var(--accent-green);
-      text-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+      text-shadow: 0 0 8px rgba(var(--accent-green-rgb), 0.5);
     }
 
     /* Large Stat Block */

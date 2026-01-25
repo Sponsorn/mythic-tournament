@@ -383,6 +383,8 @@ function createWebServer(config = {}) {
       console.log(`[WebServer] Overlays available at:`);
       console.log(`  - Stream Overlay (1920x300): http://${host}:${port}/overlays/stream-overlay.html`);
       console.log(`  - Scoreboard Fullscreen: http://${host}:${port}/overlays/scoreboard-fullscreen.html`);
+      console.log(`  - Best Times (1920x1080): http://${host}:${port}/overlays/best-times-overlay.html`);
+      console.log(`  - Commands (576x108): http://${host}:${port}/overlays/commands-overlay.html`);
       console.log(`  - Admin: http://${host}:${port}/admin/`);
       resolve({ app, server, io });
     });

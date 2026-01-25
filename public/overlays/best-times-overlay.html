@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament - Best Times</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <style>
+    /* Best Times Overlay - 1920x1080 Full Canvas */
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    .canvas {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .best-times-overlay {
+      display: flex;
+      flex-direction: column;
+      width: 1800px;
+      height: 950px;
+      background: var(--bg-primary);
+      border: 3px solid rgba(59, 130, 246, 0.4);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+      overflow: hidden;
+    }
+
+    /* Header with dungeon selector */
+    .overlay-header {
+      display: flex;
+      align-items: center;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: var(--spacing-md) var(--spacing-lg);
+      gap: var(--spacing-lg);
+      flex-shrink: 0;
+    }
+
+    .overlay-logo {
+      width: 50px;
+      height: auto;
+      opacity: 0.9;
+    }
+
+    .overlay-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+      margin-right: var(--spacing-lg);
+    }
+
+    .dungeon-buttons {
+      display: flex;
+      gap: var(--spacing-sm);
+      flex: 1;
+    }
+
+    .dungeon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--spacing-sm) var(--spacing-lg);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .dungeon-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .dungeon-btn.active {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      border-color: #3b82f6;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+    }
+
+    .overlay-updated {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: right;
+      margin-left: auto;
+    }
+
+    /* Main content - runs grouped by key level */
+    .runs-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: var(--spacing-md);
+      gap: var(--spacing-md);
+      overflow-y: auto;
+    }
+
+    /* Level section */
+    .level-section {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .level-header {
+      display: flex;
+      align-items: center;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: var(--spacing-sm) var(--spacing-lg);
+      gap: var(--spacing-md);
+    }
+
+    .level-badge {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent-blue);
+    }
+
+    .level-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* Team rows container with shared markers */
+    .team-rows-wrapper {
+      position: relative;
+      padding: 20px var(--spacing-lg) var(--spacing-sm);
+    }
+
+    /* Shared vertical markers across all rows */
+    .shared-markers {
+      position: absolute;
+      top: 20px;
+      bottom: var(--spacing-sm);
+      /* Align with progress bar column: rank(50) + gap(12) + name(160) + gap(12) + padding(24) = ~258px */
+      left: 258px;
+      /* Right offset: time(70) + gap(12) + stars(55) + padding(24) = ~161px */
+      right: 161px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .shared-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.3);
+    }
+    .shared-marker.m60 { left: 60%; }
+    .shared-marker.m80 { left: 80%; }
+    .shared-marker.m100 { left: 100%; width: 3px; background: rgba(255, 255, 255, 0.5); }
+
+    .shared-marker-label {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: #ffd700;
+      white-space: nowrap;
+    }
+
+    /* Team rows */
+    .team-rows {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 2;
+    }
+
+    .team-row {
+      display: grid;
+      grid-template-columns: 50px 160px 1fr 70px 55px;
+      gap: var(--spacing-md);
+      align-items: center;
+      padding: var(--spacing-sm) 0;
+    }
+
+    .team-row:nth-child(odd) {
+      background: rgba(26, 51, 92, 0.3);
+    }
+
+    /* Rank */
+    .rank-cell {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .rank-cell.rank-1 { color: #ffd700; }
+    .rank-cell.rank-2 { color: #c0c0c0; }
+    .rank-cell.rank-3 { color: #cd7f32; }
+    .rank-cell.rank-other { color: var(--text-muted); }
+
+    /* Team name */
+    .team-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Progress bar */
+    .time-bar-container {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+    }
+
+    .time-bar {
+      flex: 1;
+      height: 28px;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+      overflow: visible;
+      position: relative;
+    }
+
+    .time-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      background: var(--accent-blue);
+    }
+
+    /* Boss markers on individual bars */
+    .boss-markers {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+
+    .boss-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      transform: translateX(-100%);
+    }
+
+    .boss-marker::after {
+      content: '';
+      width: 2px;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      flex-shrink: 0;
+    }
+
+    .boss-text {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      margin-right: 6px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    /* Time text */
+    .time-text {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      text-align: right;
+      min-width: 60px;
+      color: var(--text-primary);
+    }
+
+    /* Upgrade stars */
+    .upgrade-stars {
+      font-size: 16px;
+      min-width: 50px;
+      text-align: left;
+    }
+    .upgrade-stars.three { color: #ff8000; }
+    .upgrade-stars.two { color: #a335ee; }
+    .upgrade-stars.one { color: #1eff00; }
+    .upgrade-stars.depleted { color: var(--text-muted); }
+
+    /* No data state */
+    .no-data {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-muted);
+      font-size: 18px;
+    }
+
+    /* Connection status */
+    .overlay-connection {
+      position: fixed;
+      bottom: 8px;
+      right: 8px;
+      font-size: 11px;
+      color: var(--accent-red);
+      background: rgba(0,0,0,0.7);
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      opacity: 0;
+      transition: opacity var(--transition-fast);
+    }
+    .overlay-connection.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="best-times-overlay">
+      <!-- Header with dungeon selector -->
+      <div class="overlay-header">
+        <img class="overlay-logo" src="/images/luckywipelogo.png" alt="Logo">
+        <div class="overlay-title">Best Times</div>
+        <div class="dungeon-buttons" id="dungeonButtons">
+          <!-- Rendered dynamically -->
+        </div>
+        <div class="overlay-updated" id="lastUpdated">Updated: --:--</div>
+      </div>
+
+      <!-- Main content - runs grouped by key level -->
+      <div class="runs-container" id="runsContainer">
+        <div class="no-data">Select a dungeon</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay-connection" id="connectionStatus">Disconnected</div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script>
+    const client = initTournamentClient();
+    const dungeonButtonsEl = document.getElementById('dungeonButtons');
+    const runsContainerEl = document.getElementById('runsContainer');
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+    const connectionStatusEl = document.getElementById('connectionStatus');
+
+    // State
+    let bestTimes = {};           // From API: { fullDungeonName: [run, run, ...] }
+    let shortNameMap = {};        // Dungeon slug -> short name
+    let dungeonPars = {};         // Dungeon slug -> par time in ms
+    let allDungeonNames = [];     // Full dungeon names from bestTimes
+    let selectedDungeon = null;
+
+    // Poll countdown
+    let pollCountdownInterval = null;
+    let nextPollTime = null;
+
+    // Slugify dungeon name (same as backend)
+    function slugifyDungeon(name) {
+      return String(name || '')
+        .toLowerCase()
+        .trim()
+        .replace(/['`]/g, "'")
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+
+    // Get short name for a dungeon
+    function getShortName(dungeonName) {
+      const slug = slugifyDungeon(dungeonName);
+      return shortNameMap[slug] || dungeonName.substring(0, 4).toUpperCase();
+    }
+
+    // Get par time for a dungeon
+    function getParTime(dungeonName) {
+      const slug = slugifyDungeon(dungeonName);
+      return dungeonPars[slug] || null;
+    }
+
+    // Initialize
+    async function init() {
+      try {
+        const [shortNamesRes, bestTimesRes, parsRes] = await Promise.all([
+          fetch('/api/dungeon-short-names'),
+          fetch('/api/best-times'),
+          fetch('/api/dungeon-pars')
+        ]);
+        shortNameMap = await shortNamesRes.json();
+        bestTimes = await bestTimesRes.json();
+        dungeonPars = await parsRes.json();
+
+        // Get dungeon names from bestTimes keys
+        allDungeonNames = Object.keys(bestTimes).sort();
+
+        // Default to first dungeon with data
+        if (!selectedDungeon && allDungeonNames.length > 0) {
+          selectedDungeon = allDungeonNames[0];
+        }
+
+        renderDungeonButtons();
+        renderRuns();
+      } catch (err) {
+        console.error('Failed to initialize:', err);
+      }
+    }
+
+    // Handle dungeon click
+    function selectDungeon(dungeonName) {
+      selectedDungeon = dungeonName;
+      renderDungeonButtons();
+      renderRuns();
+    }
+
+    // Render dungeon buttons
+    function renderDungeonButtons() {
+      if (allDungeonNames.length === 0) {
+        dungeonButtonsEl.innerHTML = '<span style="color: var(--text-muted);">No data yet</span>';
+        return;
+      }
+
+      const html = allDungeonNames.map(name => {
+        const shortName = getShortName(name);
+        const isActive = name === selectedDungeon;
+        return `
+          <button class="dungeon-btn ${isActive ? 'active' : ''}" data-dungeon="${escapeHtml(name)}">
+            ${shortName}
+          </button>
+        `;
+      }).join('');
+
+      dungeonButtonsEl.innerHTML = html;
+
+      // Add click handlers
+      dungeonButtonsEl.querySelectorAll('.dungeon-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectDungeon(btn.dataset.dungeon);
+        });
+      });
+    }
+
+    // Get best run per team per level, ranked by run performance
+    function getRunsGroupedByLevel() {
+      const allRuns = bestTimes[selectedDungeon] || [];
+
+      // Get best run per team per level
+      const bestPerTeamLevel = {};
+      for (const run of allRuns) {
+        const key = `${run.team}|${run.level}`;
+        if (!bestPerTeamLevel[key] || run.duration_ms < bestPerTeamLevel[key].duration_ms) {
+          bestPerTeamLevel[key] = run;
+        }
+      }
+      const filteredRuns = Object.values(bestPerTeamLevel);
+
+      // Sort all runs by level (desc) then time (asc) to get overall rank
+      const rankedRuns = [...filteredRuns].sort((a, b) => {
+        if (b.level !== a.level) return b.level - a.level;
+        return a.duration_ms - b.duration_ms;
+      });
+
+      // Assign rank to each run
+      const runRankMap = new Map();
+      rankedRuns.forEach((run, idx) => {
+        const key = `${run.team}|${run.level}`;
+        runRankMap.set(key, idx + 1);
+      });
+
+      // Group runs by level with their rank
+      const grouped = {};
+      for (const run of filteredRuns) {
+        if (!grouped[run.level]) {
+          grouped[run.level] = [];
+        }
+        const key = `${run.team}|${run.level}`;
+        grouped[run.level].push({ ...run, dungeonRank: runRankMap.get(key) });
+      }
+
+      // Sort each level's runs by rank
+      for (const level of Object.keys(grouped)) {
+        grouped[level].sort((a, b) => a.dungeonRank - b.dungeonRank);
+      }
+
+      // Get levels sorted descending
+      const levels = Object.keys(grouped)
+        .map(Number)
+        .sort((a, b) => b - a);
+
+      return { grouped, levels };
+    }
+
+    // Render runs
+    function renderRuns() {
+      if (!selectedDungeon) {
+        runsContainerEl.innerHTML = '<div class="no-data">Select a dungeon</div>';
+        return;
+      }
+
+      const { grouped, levels } = getRunsGroupedByLevel();
+      const parTime = getParTime(selectedDungeon);
+
+      if (levels.length === 0) {
+        runsContainerEl.innerHTML = '<div class="no-data">No timed runs for this dungeon yet</div>';
+        return;
+      }
+
+      const html = levels.map(level => {
+        const runs = grouped[level];
+
+        const rowsHtml = runs.map((run) => {
+          const rank = run.dungeonRank;
+          let rankClass = 'rank-other';
+          if (rank === 1) rankClass = 'rank-1';
+          else if (rank === 2) rankClass = 'rank-2';
+          else if (rank === 3) rankClass = 'rank-3';
+
+          const { bar, stars } = renderTimeBar(run.duration_ms, parTime, run.upgrades, run.boss_kills);
+
+          return `
+            <div class="team-row">
+              <div class="rank-cell ${rankClass}">#${rank}</div>
+              <div class="team-name">${escapeHtml(run.team)}</div>
+              ${bar}
+              ${stars}
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="level-section">
+            <div class="level-header">
+              <div class="level-badge">+${level}</div>
+              <div class="level-label">${runs.length} team${runs.length !== 1 ? 's' : ''}</div>
+            </div>
+            <div class="team-rows-wrapper">
+              <div class="shared-markers">
+                <div class="shared-marker m60"><span class="shared-marker-label">★★★</span></div>
+                <div class="shared-marker m80"><span class="shared-marker-label">★★</span></div>
+                <div class="shared-marker m100"><span class="shared-marker-label">★</span></div>
+              </div>
+              <div class="team-rows">
+                ${rowsHtml}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      runsContainerEl.innerHTML = html;
+    }
+
+    // Render time bar (without shared markers - those are at section level)
+    function renderTimeBar(durationMs, parTime, upgrades, bossKills) {
+      if (!durationMs || durationMs <= 0 || !parTime) {
+        return {
+          bar: `
+            <div class="time-bar-container">
+              <div class="time-bar">
+                <div class="time-bar-fill" style="width: 100%;"></div>
+              </div>
+              <span class="time-text">--:--</span>
+            </div>
+          `,
+          stars: `<span class="upgrade-stars depleted">-</span>`
+        };
+      }
+
+      // Calculate percentage of par time used
+      const percentage = (durationMs / parTime) * 100;
+      const displayPercentage = Math.min(percentage, 110);
+
+      // Determine star class and text based on upgrades
+      let starClass = 'depleted';
+      let starText = '-';
+      if (upgrades >= 3) { starClass = 'three'; starText = '★★★'; }
+      else if (upgrades >= 2) { starClass = 'two'; starText = '★★'; }
+      else if (upgrades >= 1) { starClass = 'one'; starText = '★'; }
+
+      const timeStr = formatDuration(durationMs);
+
+      // Build boss markers HTML with "B1: xx:xx" format above the line
+      let bossMarkersHtml = '';
+      if (bossKills && Array.isArray(bossKills) && bossKills.length > 0) {
+        bossKills.forEach((killMs, idx) => {
+          const bossPercentage = (killMs / parTime) * 100;
+          if (bossPercentage <= 110) {
+            const bossTime = formatDuration(killMs);
+            bossMarkersHtml += `
+              <div class="boss-marker" style="left: ${bossPercentage}%;">
+                <span class="boss-text">B${idx + 1}: ${bossTime}</span>
+              </div>
+            `;
+          }
+        });
+      }
+
+      return {
+        bar: `
+          <div class="time-bar-container">
+            <div class="time-bar">
+              <div class="boss-markers">${bossMarkersHtml}</div>
+              <div class="time-bar-fill" style="width: ${displayPercentage}%;"></div>
+            </div>
+            <span class="time-text">${timeStr}</span>
+          </div>
+        `,
+        stars: `<span class="upgrade-stars ${starClass}">${starText}</span>`
+      };
+    }
+
+    // Format duration
+    function formatDuration(ms) {
+      if (!ms || ms <= 0) return '--:--';
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // Update timestamp
+    function updateTimestamp(time) {
+      if (!time) {
+        lastUpdatedEl.textContent = 'Updated: --:--';
+        return;
+      }
+      const date = new Date(time);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      lastUpdatedEl.textContent = `Updated: ${hours}:${minutes}`;
+    }
+
+    // Refresh best times
+    async function refreshBestTimes() {
+      try {
+        const res = await fetch('/api/best-times');
+        bestTimes = await res.json();
+
+        const newDungeonNames = Object.keys(bestTimes).sort();
+        if (newDungeonNames.length !== allDungeonNames.length) {
+          allDungeonNames = newDungeonNames;
+          if (!allDungeonNames.includes(selectedDungeon) && allDungeonNames.length > 0) {
+            selectedDungeon = allDungeonNames[0];
+          }
+          renderDungeonButtons();
+        }
+
+        renderRuns();
+      } catch (err) {
+        console.error('Failed to refresh best times:', err);
+      }
+    }
+
+    // Poll countdown
+    function startPollCountdown(intervalMs) {
+      nextPollTime = Date.now() + intervalMs;
+      if (pollCountdownInterval) clearInterval(pollCountdownInterval);
+
+      function updateCountdown() {
+        const remaining = Math.max(0, nextPollTime - Date.now());
+        if (remaining <= 0) {
+          clearInterval(pollCountdownInterval);
+          pollCountdownInterval = null;
+          refreshBestTimes();
+          return;
+        }
+      }
+
+      updateCountdown();
+      pollCountdownInterval = setInterval(updateCountdown, 1000);
+    }
+
+    // Socket events
+    client.on('connected', () => {
+      connectionStatusEl.classList.remove('visible');
+    });
+
+    client.on('disconnected', () => {
+      connectionStatusEl.textContent = 'Disconnected';
+      connectionStatusEl.classList.add('visible');
+    });
+
+    client.on('state:sync', (state) => {
+      updateTimestamp(state.lastPollTime);
+      if (state.lastPollTime && state.nextPollMs) {
+        const elapsed = Date.now() - state.lastPollTime;
+        const remaining = Math.max(0, state.nextPollMs - elapsed);
+        startPollCountdown(remaining);
+      }
+    });
+
+    client.on('poll:complete', (data) => {
+      updateTimestamp(data.time);
+      startPollCountdown(data.nextPollMs || 30000);
+      lastUpdatedEl.style.color = 'var(--accent-green)';
+      setTimeout(() => { lastUpdatedEl.style.color = ''; }, 1000);
+      refreshBestTimes();
+    });
+
+    client.on('scoreboard:update', () => {
+      refreshBestTimes();
+    });
+
+    window.addEventListener('beforeunload', () => {
+      if (pollCountdownInterval) clearInterval(pollCountdownInterval);
+    });
+
+    // Initialize
+    init();
+  </script>
+</body>
+</html>

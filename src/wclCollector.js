@@ -5,7 +5,7 @@ const {
   wclCountDeathsForFight,
   makeAbsMs,
 } = require('./wclApi');
-const { calcUpgradesFromPar, pointsFor } = require('./wclScoring');
+const { calcUpgradesFromPar, pointsFor, DUNGEON_PAR_MS, slugifyDungeon } = require('./wclScoring');
 const {
   getTeams,
   getSeenWcl,
@@ -66,10 +66,11 @@ function teamNumber(teamName, teams) {
 async function collectRunsAndSync() {
   const publicMsgs = [];
   const privateMsgs = [];
+  const completedRuns = []; // Track completed runs to clear active status
   const window = parseEventWindow();
 
   const teams = getTeams();
-  if (!teams.length) return { publicMsgs, privateMsgs, newCount: 0 };
+  if (!teams.length) return { publicMsgs, privateMsgs, newCount: 0, completedRuns };
 
   const seen = getSeenWcl();
   const newSeen = new Set();
@@ -209,6 +210,22 @@ async function collectRunsAndSync() {
         const teamLabel = num ? `${teamName} (Team ${num})` : teamName;
         const upgLabel = inTime ? `+${upgrades}` : 'depleted';
 
+        // Track completed run for clearing active status
+        const dungeonSlug = slugifyDungeon(fight.name);
+        completedRuns.push({
+          teamName,
+          dungeonName: fight.name,
+          keystoneLevel: lvl,
+          duration: adjustedClearMs,
+          parTime: DUNGEON_PAR_MS[dungeonSlug] || 1800000,
+          inTime,
+          upgrades,
+          deaths,
+          points,
+          blizzRating: blizzRating,
+          completedAt: dtEnd.toISOString(),
+        });
+
         privateMsgs.push(
           `${teamLabel} completed ${fight.name} +${lvl}, ${upgLabel}, timer: ${timerStr}, points: ${points}`
         );
@@ -222,7 +239,7 @@ async function collectRunsAndSync() {
     saveSeenWcl(merged);
   }
 
-  return { publicMsgs, privateMsgs, newCount: added };
+  return { publicMsgs, privateMsgs, newCount: added, completedRuns };
 }
 
 module.exports = { collectRunsAndSync };

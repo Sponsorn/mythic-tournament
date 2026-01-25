@@ -6,18 +6,6 @@
   <title>M+ Tournament - Fullscreen Scoreboard</title>
   <link rel="stylesheet" href="/css/common.css">
   <style>
-    /* Custom color theme */
-    :root {
-      --bg-primary: #0a1530;
-      --bg-secondary: #0c2448;
-      --bg-tertiary: #0e2a52;
-      --bg-hover: #102f5c;
-      --border-subtle: #1a3a6e;
-      --text-primary: #ffffff;
-      --text-secondary: #e0e8f0;
-      --text-muted: #a0b4d0;
-    }
-
     /* Fullscreen scoreboard for 1920x1080 OBS canvas */
     html, body {
       width: 1920px;
@@ -69,7 +57,7 @@
     /* Column Headers */
     .scoreboard-columns {
       display: grid;
-      grid-template-columns: 80px 1fr 140px 160px 120px 160px 120px;
+      grid-template-columns: 80px 1fr 80px 140px 160px 120px 160px 120px;
       gap: var(--spacing-md);
       padding: var(--spacing-lg) var(--spacing-xl);
       background: var(--bg-tertiary);
@@ -101,7 +89,7 @@
     /* Team Card Row */
     .team-card {
       display: grid;
-      grid-template-columns: 80px 1fr 140px 160px 120px 160px 120px;
+      grid-template-columns: 80px 1fr 80px 140px 160px 120px 160px 120px;
       gap: var(--spacing-md);
       padding: var(--spacing-lg) var(--spacing-lg);
       background: var(--bg-secondary);
@@ -115,7 +103,7 @@
     }
 
     .team-card.rank-changed {
-      background: rgba(74, 222, 128, 0.15);
+      background: rgba(var(--accent-green-rgb), 0.15);
     }
 
     /* Podium styling */
@@ -219,27 +207,27 @@
     }
 
     .bracket-a {
-      background: rgba(96, 165, 250, 0.2);
+      background: rgba(var(--accent-blue-rgb), 0.2);
       color: var(--accent-blue);
-      border: 1px solid rgba(96, 165, 250, 0.3);
+      border: 1px solid rgba(var(--accent-blue-rgb), 0.3);
     }
 
     .bracket-b {
-      background: rgba(74, 222, 128, 0.2);
+      background: rgba(var(--accent-green-rgb), 0.2);
       color: var(--accent-green);
-      border: 1px solid rgba(74, 222, 128, 0.3);
+      border: 1px solid rgba(var(--accent-green-rgb), 0.3);
     }
 
     .bracket-c {
-      background: rgba(251, 191, 36, 0.2);
+      background: rgba(var(--accent-yellow-rgb), 0.2);
       color: var(--accent-yellow);
-      border: 1px solid rgba(251, 191, 36, 0.3);
+      border: 1px solid rgba(var(--accent-yellow-rgb), 0.3);
     }
 
     .bracket-d {
-      background: rgba(168, 85, 247, 0.2);
-      color: #a855f7;
-      border: 1px solid rgba(168, 85, 247, 0.3);
+      background: rgba(var(--accent-purple-rgb), 0.2);
+      color: var(--accent-purple);
+      border: 1px solid rgba(var(--accent-purple-rgb), 0.3);
     }
 
     /* Stats Cells */
@@ -288,14 +276,14 @@
     }
 
     .status-indicator.running {
-      color: #4ade80;
-      background: rgba(74, 222, 128, 0.2);
-      box-shadow: 0 0 12px rgba(74, 222, 128, 0.4), 0 0 24px rgba(74, 222, 128, 0.2);
+      color: var(--accent-green);
+      background: rgba(var(--accent-green-rgb), 0.2);
+      box-shadow: 0 0 12px rgba(var(--accent-green-rgb), 0.4), 0 0 24px rgba(var(--accent-green-rgb), 0.2);
     }
 
     .status-indicator.running .status-dot {
-      background: #4ade80;
-      box-shadow: 0 0 8px rgba(74, 222, 128, 0.8), 0 0 16px rgba(74, 222, 128, 0.5);
+      background: var(--accent-green);
+      box-shadow: 0 0 8px rgba(var(--accent-green-rgb), 0.8), 0 0 16px rgba(var(--accent-green-rgb), 0.5);
       animation: pulse 1s infinite;
     }
 
@@ -349,6 +337,7 @@
     <div class="scoreboard-columns">
       <div class="col-center">Rank</div>
       <div>Team</div>
+      <div class="col-center">Team #</div>
       <div class="col-center">Bracket</div>
       <div class="col-center">Highest Key</div>
       <div class="col-center">Runs</div>
@@ -461,8 +450,9 @@
           }
         }
 
-        const statusClass = entry.status === 'running' ? 'running' : '';
-        const statusText = entry.status === 'running' ? 'LIVE' : 'Idle';
+        const isActive = activeRuns.some(r => r.teamName === entry.teamName);
+        const statusClass = isActive ? 'running' : '';
+        const statusText = isActive ? 'Active' : 'Idle';
         const podiumClass = entry.rank <= 3 ? `podium-${entry.rank}` : '';
 
         // Get team bracket
@@ -486,6 +476,7 @@
             <div class="team-info">
               <div class="team-name">${escapeHtml(entry.teamName)}${rankChangeHtml}</div>
             </div>
+            <div class="stat-cell"><span class="team-cell-number">Team ${team?.id || '-'}</span></div>
             <div class="bracket-cell">
               <span class="bracket-badge bracket-${bracket.toLowerCase()}">Bracket ${bracket}</span>
             </div>

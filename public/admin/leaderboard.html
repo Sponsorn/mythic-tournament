@@ -7,10 +7,10 @@
   <link rel="stylesheet" href="/css/common.css">
   <link rel="stylesheet" href="/css/theme.css">
   <style>
-    /* Grid columns for 8-column admin layout */
+    /* Grid columns for 9-column admin layout */
     .lb-columns,
     .team-card {
-      grid-template-columns: 50px 1fr 90px 100px 80px 80px 100px 80px;
+      grid-template-columns: 50px 1fr 80px 90px 100px 80px 80px 100px 80px;
     }
   </style>
 </head>
@@ -44,6 +44,7 @@
       <div class="lb-columns">
         <div class="col-center">Rank</div>
         <div>Team</div>
+        <div class="col-center">Team #</div>
         <div class="col-center">Bracket</div>
         <div class="col-center">Highest Key</div>
         <div class="col-center">Runs</div>
@@ -167,7 +168,7 @@
       const html = leaderboard.map((entry) => {
         const isActive = activeRuns.some(r => r.teamName === entry.teamName);
         const statusClass = isActive ? 'running' : '';
-        const statusText = isActive ? 'LIVE' : 'Idle';
+        const statusText = isActive ? 'Active' : 'Idle';
         const stats = teamStats[entry.teamName] || { highestKey: 0, uniqueDungeons: 0 };
         const team = teams.find(t => t.name === entry.teamName);
         const bracket = team?.bracket || 'A';
@@ -191,6 +192,7 @@
             <div class="team-info">
               <div class="team-name">${escapeHtml(entry.teamName)}</div>
             </div>
+            <div class="stat-cell"><span class="team-cell-number">Team ${team?.id || '-'}</span></div>
             <div class="bracket-cell">
               <span class="bracket-badge bracket-${bracket.toLowerCase()}">Bracket ${bracket}</span>
             </div>

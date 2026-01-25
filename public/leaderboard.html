@@ -57,10 +57,10 @@
       max-height: 120px;
     }
 
-    /* Grid columns for 7-column public layout */
+    /* Grid columns for 8-column public layout */
     .lb-columns,
     .team-card {
-      grid-template-columns: 50px 1fr 90px 100px 80px 100px 80px;
+      grid-template-columns: 50px 1fr 80px 90px 100px 80px 100px 80px;
     }
 
     .lb-columns {
@@ -83,6 +83,7 @@
     <div class="lb-columns">
       <div class="col-center">Rank</div>
       <div>Team</div>
+      <div class="col-center">Team #</div>
       <div class="col-center">Bracket</div>
       <div class="col-center">Highest Key</div>
       <div class="col-center">Runs</div>
@@ -168,7 +169,7 @@
         const stats = teamStats[entry.teamName] || { highestKey: 0 };
         const isActive = activeRuns.some(r => r.teamName === entry.teamName);
         const statusClass = isActive ? 'running' : '';
-        const statusText = isActive ? 'LIVE' : 'Idle';
+        const statusText = isActive ? 'Active' : 'Idle';
         const podiumClass = entry.rank <= 3 ? `podium-${entry.rank}` : '';
 
         // Rank display: medal for top 3, number for others
@@ -189,6 +190,7 @@
             <div class="team-info">
               <div class="team-name">${escapeHtml(entry.teamName)}</div>
             </div>
+            <div class="stat-cell"><span class="team-cell-number">Team ${team?.id || '-'}</span></div>
             <div class="bracket-cell">
               <span class="bracket-badge bracket-${bracket.toLowerCase()}">Bracket ${bracket}</span>
             </div>

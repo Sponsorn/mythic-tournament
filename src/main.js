@@ -85,14 +85,20 @@ async function pollWclRuns() {
   // Track API request
   stateManager.recordApiRequest();
 
-  const { privateMsgs, newCount } = await collectRunsAndSync();
+  const { privateMsgs, newCount, completedRuns } = await collectRunsAndSync();
 
   // Update state manager
   stateManager.refreshTeams();
   stateManager.refreshLeaderboard();
 
-  // Process completed runs for state manager
-  if (newCount > 0) {
+  // Process completed runs - clear active status for teams with finished runs
+  if (completedRuns && completedRuns.length > 0) {
+    for (const run of completedRuns) {
+      // Clear active run status for this team (onRunComplete handles this)
+      stateManager.onRunComplete(run.teamName, run);
+    }
+  } else if (newCount > 0) {
+    // Fallback: just emit scoreboard update if we have new runs but no completedRuns data
     stateManager.emit('scoreboard:update', stateManager.getLeaderboard());
   }
 

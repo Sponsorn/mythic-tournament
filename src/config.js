@@ -60,6 +60,9 @@ const POLL_INTERVAL_IDLE_MS = parseIntEnv('POLL_INTERVAL_IDLE_MS', 300000, 60000
 const CORS_ORIGINS = getStringEnv('CORS_ORIGINS'); // Comma-separated origins, empty = allow all
 const ADMIN_SECRET = getStringEnv('ADMIN_SECRET'); // Shared secret for admin socket auth, empty = no auth
 
+// OBS WebSocket Proxy Configuration
+const OBS_WS_PORT = parseIntEnv('OBS_WS_PORT', 4455, 1, 65535); // Default OBS WebSocket port
+
 // Timezone Configuration
 const REALM_TZ = getStringEnv('REALM_TZ', 'Europe/Stockholm');
 
@@ -113,6 +116,7 @@ module.exports = {
   POLL_INTERVAL_IDLE_MS,
   CORS_ORIGINS,
   ADMIN_SECRET,
+  OBS_WS_PORT,
 
   // Timezones
   REALM_TZ,

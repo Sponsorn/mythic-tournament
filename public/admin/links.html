@@ -118,6 +118,13 @@
       <div class="links-grid" id="adminLinks">
       </div>
     </div>
+
+    <!-- Tools -->
+    <div class="link-section">
+      <div class="link-section-title">Tools</div>
+      <div class="links-grid" id="toolLinks">
+      </div>
+    </div>
   </div>
 
   <script>
@@ -165,10 +172,22 @@
       { title: 'Best Times', path: '/admin/best-times.html', desc: 'Best run times per dungeon' },
     ];
 
+    const tools = [
+      { title: 'OBS Remote (obs-web)', path: 'https://obs-web.niek.tv/', desc: 'Remote control OBS via WebSocket proxy. Connect to: wss://YOUR-NGROK/obs-ws', external: true },
+      { title: 'OBS WebSocket Proxy', path: '/obs-ws', desc: 'WebSocket endpoint for OBS control (use with obs-web or other clients)', wsEndpoint: true },
+    ];
+
     function renderLinks(containerId, links) {
       const container = document.getElementById(containerId);
       container.innerHTML = links.map(link => {
-        const fullUrl = baseUrl + link.path;
+        let fullUrl;
+        if (link.external) {
+          fullUrl = link.path;
+        } else if (link.wsEndpoint) {
+          fullUrl = baseUrl.replace(/^http/, 'ws') + link.path;
+        } else {
+          fullUrl = baseUrl + link.path;
+        }
         const sizeInfo = link.width ? ` (${link.width}x${link.height})` : '';
         return `
           <div class="link-card">
@@ -215,6 +234,7 @@
       renderLinks('overlayLinks', overlays);
       renderLinks('publicLinks', publicPages);
       renderLinks('adminLinks', adminPages);
+      renderLinks('toolLinks', tools);
     }
 
     renderAll();

@@ -25,22 +25,120 @@
       overflow: hidden;
     }
 
-    .commands-header {
+    .progress-header {
       background: var(--bg-tertiary);
-      padding: 6px 16px;
+      padding: 8px 16px;
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
-      align-items: center;
-      gap: 10px;
+      flex-direction: column;
+      gap: 4px;
     }
 
-    .commands-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: #fff;
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .progress-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+    .progress-time {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .progress-time.countdown {
+      color: var(--accent-gold);
+    }
+
+    .progress-time.break {
+      color: var(--accent-orange, #ff9500);
+    }
+
+    .progress-time.ended {
+      color: var(--accent-green);
+    }
+
+    .progress-bar-container {
+      position: relative;
+      width: 100%;
+      height: 12px;
+      background: var(--bg-primary);
+      border-radius: 6px;
+      overflow: visible;
+    }
+
+    .progress-bar-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-secondary);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple, #a855f7));
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+
+    .progress-bar-fill.countdown {
+      background: linear-gradient(90deg, var(--accent-gold), var(--accent-orange, #ff9500));
+    }
+
+    .break-marker {
+      position: absolute;
+      top: -2px;
+      width: 3px;
+      height: 16px;
+      background: var(--accent-orange, #ff9500);
+      border-radius: 2px;
+      z-index: 2;
+    }
+
+    .break-marker::after {
+      content: 'BREAK';
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 8px;
+      font-weight: 700;
+      color: var(--accent-orange, #ff9500);
+      white-space: nowrap;
+    }
+
+    .break-zone {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      background: rgba(255, 149, 0, 0.3);
+      border-left: 2px solid var(--accent-orange, #ff9500);
+      border-right: 2px solid var(--accent-orange, #ff9500);
+    }
+
+    .time-markers {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 2px;
+    }
+
+    .time-marker {
+      font-size: 9px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
     }
 
     .commands-body {
@@ -83,8 +181,18 @@
 </head>
 <body>
   <div class="commands-box">
-    <div class="commands-header">
-      <span class="commands-title">Chat Commands</span>
+    <div class="progress-header">
+      <div class="progress-info">
+        <span class="progress-label" id="progressLabel">Tournament Starts In</span>
+        <span class="progress-time countdown" id="progressTime">--:--</span>
+      </div>
+      <div class="progress-bar-container">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill countdown" id="progressFill" style="width: 0%"></div>
+        </div>
+        <div class="break-zone" id="breakZone" style="display: none;"></div>
+        <div class="break-marker" id="breakMarker" style="display: none;"></div>
+      </div>
     </div>
     <div class="commands-body">
       <div class="command">
@@ -103,5 +211,106 @@
       </div>
     </div>
   </div>
+
+  <script>
+    // Tournament schedule (CET/local time)
+    const TOURNAMENT_START = new Date('2026-01-31T18:00:00');
+    const BREAK_START = new Date('2026-01-31T19:30:00');
+    const BREAK_END = new Date('2026-01-31T20:00:00');
+    const TOURNAMENT_END = new Date('2026-01-31T21:30:00');
+
+    // Total duration for progress calculation (excluding break)
+    const TOTAL_DURATION_MS = TOURNAMENT_END - TOURNAMENT_START;
+    const BREAK_DURATION_MS = BREAK_END - BREAK_START;
+
+    // Elements
+    const progressLabel = document.getElementById('progressLabel');
+    const progressTime = document.getElementById('progressTime');
+    const progressFill = document.getElementById('progressFill');
+    const breakMarker = document.getElementById('breakMarker');
+    const breakZone = document.getElementById('breakZone');
+
+    function formatHoursMinutes(ms) {
+      const totalMinutes = Math.floor(ms / 60000);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      if (hours > 0) {
+        return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+      }
+      return `${minutes}m`;
+    }
+
+    function updateProgress() {
+      const now = new Date();
+
+      // Before tournament starts - countdown mode
+      if (now < TOURNAMENT_START) {
+        const remaining = TOURNAMENT_START - now;
+        progressLabel.textContent = 'Tournament Starts In';
+        progressTime.textContent = formatHoursMinutes(remaining);
+        progressTime.className = 'progress-time countdown';
+        progressFill.className = 'progress-bar-fill countdown';
+
+        // Show countdown progress (last 6 hours)
+        const sixHours = 6 * 60 * 60 * 1000;
+        const countdownProgress = Math.max(0, (sixHours - remaining) / sixHours * 100);
+        progressFill.style.width = `${countdownProgress}%`;
+
+        // Hide break markers during countdown
+        breakMarker.style.display = 'none';
+        breakZone.style.display = 'none';
+        return;
+      }
+
+      // After tournament ends
+      if (now >= TOURNAMENT_END) {
+        progressLabel.textContent = 'Tournament Complete';
+        progressTime.textContent = 'GG!';
+        progressTime.className = 'progress-time ended';
+        progressFill.className = 'progress-bar-fill';
+        progressFill.style.width = '100%';
+        progressFill.style.background = 'linear-gradient(90deg, var(--accent-green), var(--accent-blue))';
+        breakMarker.style.display = 'none';
+        breakZone.style.display = 'none';
+        return;
+      }
+
+      // During tournament - show progress to end
+      const elapsed = now - TOURNAMENT_START;
+      const progress = (elapsed / TOTAL_DURATION_MS) * 100;
+      progressFill.className = 'progress-bar-fill';
+      progressFill.style.width = `${Math.min(100, progress)}%`;
+
+      // Calculate break marker position (as % of total duration)
+      const breakStartPercent = ((BREAK_START - TOURNAMENT_START) / TOTAL_DURATION_MS) * 100;
+      const breakEndPercent = ((BREAK_END - TOURNAMENT_START) / TOTAL_DURATION_MS) * 100;
+
+      breakMarker.style.display = 'block';
+      breakMarker.style.left = `${breakStartPercent}%`;
+
+      breakZone.style.display = 'block';
+      breakZone.style.left = `${breakStartPercent}%`;
+      breakZone.style.width = `${breakEndPercent - breakStartPercent}%`;
+
+      // During break
+      if (now >= BREAK_START && now < BREAK_END) {
+        const breakRemaining = BREAK_END - now;
+        progressLabel.textContent = 'Break - Resumes In';
+        progressTime.textContent = formatHoursMinutes(breakRemaining);
+        progressTime.className = 'progress-time break';
+        return;
+      }
+
+      // Normal tournament time - show remaining
+      const remaining = TOURNAMENT_END - now;
+      progressLabel.textContent = 'Last Run Must Start By';
+      progressTime.textContent = formatHoursMinutes(remaining);
+      progressTime.className = 'progress-time';
+    }
+
+    // Update every second
+    updateProgress();
+    setInterval(updateProgress, 1000);
+  </script>
 </body>
 </html>

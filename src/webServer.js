@@ -2,11 +2,12 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 const stateManager = require('./stateManager');
 const { updateTeam, upsertTeam, findTeam, renameTeamInLeaderboard, saveTeams, getTeams, getBestRunsPerDungeon, getAllDungeonNames, readScoresAsObjects } = require('./wclStorage');
 const { wclExtractCode } = require('./wclApi');
 const { DUNGEON_PAR_MS, DUNGEON_SHORT_NAMES } = require('./wclScoring');
-const { CORS_ORIGINS, ADMIN_SECRET } = require('./config');
+const { CORS_ORIGINS, ADMIN_SECRET, OBS_WS_PORT } = require('./config');
 
 let io = null;
 let server = null;
@@ -30,6 +31,31 @@ function createWebServer(config = {}) {
   const app = express();
   server = http.createServer(app);
 
+  // OBS WebSocket proxy - must be set up BEFORE Socket.io to handle /obs-ws upgrades
+  const obsWsProxy = createProxyMiddleware({
+    target: `ws://127.0.0.1:${OBS_WS_PORT}`,
+    ws: true,
+    changeOrigin: true,
+    logger: console,
+    on: {
+      proxyReqWs: (proxyReq, req, socket) => {
+        console.log(`[OBS-WS] Proxying WebSocket connection to OBS`);
+      },
+      error: (err, req, res) => {
+        console.error(`[OBS-WS] Proxy error:`, err.message);
+      },
+    },
+  });
+
+  // Handle WebSocket upgrades for OBS proxy BEFORE Socket.io attaches
+  server.on('upgrade', (req, socket, head) => {
+    if (req.url && req.url.startsWith('/obs-ws')) {
+      console.log(`[OBS-WS] Handling upgrade for ${req.url}`);
+      obsWsProxy.upgrade(req, socket, head);
+    }
+    // Other upgrades (like /socket.io) will be handled by Socket.io
+  });
+
   // Initialize Socket.io with CORS
   const corsOrigin = CORS_ORIGINS
     ? CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
@@ -45,6 +71,9 @@ function createWebServer(config = {}) {
   const publicPath = path.join(__dirname, '..', 'public');
   app.use(express.static(publicPath));
   app.use(express.json());
+
+  // HTTP route for OBS WebSocket (for non-upgrade requests)
+  app.use('/obs-ws', obsWsProxy);
 
   // API endpoints
   app.get('/api/state', (req, res) => {
@@ -386,6 +415,7 @@ function createWebServer(config = {}) {
       console.log(`  - Best Times (1920x1080): http://${host}:${port}/overlays/best-times-overlay.html`);
       console.log(`  - Commands (576x108): http://${host}:${port}/overlays/commands-overlay.html`);
       console.log(`  - Admin: http://${host}:${port}/admin/`);
+      console.log(`  - OBS WebSocket proxy: ws://${host}:${port}/obs-ws`);
       resolve({ app, server, io });
     });
 

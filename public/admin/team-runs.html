@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament - Team Runs</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/theme.css">
+  <style>
+    .time-bar-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    .time-bar {
+      flex: 1;
+      height: 24px;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+      overflow: visible;
+      position: relative;
+    }
+    .time-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .time-bar-fill.three { background: var(--accent-green); }
+    .time-bar-fill.two { background: var(--accent-blue); }
+    .time-bar-fill.one { background: var(--accent-yellow); }
+    .time-bar-fill.depleted { background: var(--accent-red); }
+
+    .time-bar-markers {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+    .time-bar-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+    .time-bar-marker.m60 { left: 60%; }
+    .time-bar-marker.m80 { left: 80%; }
+    .time-bar-marker.m100 { left: 100%; background: rgba(255, 255, 255, 0.8); }
+
+    .boss-marker {
+      position: absolute;
+      top: -4px;
+      bottom: -4px;
+      width: 3px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 2px;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .boss-marker:hover {
+      background: #fff;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+    }
+    .boss-marker:hover .boss-tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+    .boss-label {
+      position: absolute;
+      top: -18px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+    .boss-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s ease;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .time-text {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      min-width: 50px;
+      text-align: right;
+    }
+
+    .upgrade-col {
+      text-align: center;
+      font-family: var(--font-mono);
+      width: 32px;
+      font-weight: 600;
+    }
+    .upgrade-col.inactive { color: var(--text-muted); opacity: 0.4; }
+    .upgrade-col.one-star { color: #1eff00; }
+    .upgrade-col.two-star { color: #a335ee; }
+    .upgrade-col.three-star { color: #ff8000; }
+
+    .level-cell {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--accent-yellow);
+    }
+
+    .rank-cell {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .teams-table tbody tr:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .dungeon-section {
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: var(--spacing-md);
+      padding-bottom: var(--spacing-sm);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .deaths-cell {
+      font-family: var(--font-mono);
+      color: var(--accent-red);
+    }
+    .deaths-cell.zero { color: var(--text-secondary); }
+
+    .extra-high-cell {
+      text-align: center;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+    .extra-high-cell.active { color: var(--accent-red); }
+    .extra-high-cell.inactive { color: var(--text-muted); opacity: 0.4; }
+
+    .points-cell {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--accent-green);
+    }
+
+    .team-run-count {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 400;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <header class="admin-header">
+      <div>
+        <h1 class="admin-title">All Runs by Team</h1>
+        <p class="admin-subtitle">Complete run history grouped by team</p>
+      </div>
+      <div class="connection-badge" id="connectionBadge">
+        <span class="status-dot"></span>
+        <span id="connectionText">Connecting...</span>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="admin-nav">
+      <a href="/admin/" class="nav-link">Dashboard</a>
+      <a href="/admin/leaderboard.html" class="nav-link">Leaderboard</a>
+      <a href="/admin/best-times.html" class="nav-link">Best Times</a>
+      <a href="/admin/team-runs.html" class="nav-link active">Team Runs</a>
+      <a href="/admin/links.html" class="nav-link">Links</a>
+    </nav>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+      <div class="form-group" style="margin: 0; max-width: 400px;">
+        <label class="form-label">Filter by Team</label>
+        <select class="input" id="teamFilter">
+          <option value="">All Teams</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Runs Container -->
+    <div id="runsContainer">
+      <div class="loading-message">Loading runs...</div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script>
+    const client = initTournamentClient();
+
+    const connectionBadge = document.getElementById('connectionBadge');
+    const connectionText = document.getElementById('connectionText');
+    const teamFilter = document.getElementById('teamFilter');
+    const runsContainer = document.getElementById('runsContainer');
+
+    let allRuns = {};
+    let dungeonPars = {};
+    let teamNumberMap = {};
+
+    client.on('connected', () => {
+      connectionBadge.classList.add('connected');
+      connectionBadge.classList.remove('disconnected');
+      connectionText.textContent = 'Connected';
+      loadData();
+    });
+
+    client.on('disconnected', () => {
+      connectionBadge.classList.add('disconnected');
+      connectionBadge.classList.remove('connected');
+      connectionText.textContent = 'Disconnected';
+    });
+
+    async function loadData() {
+      try {
+        const [parsRes, teamsRes] = await Promise.all([
+          fetch('/api/dungeon-pars'),
+          fetch('/api/teams'),
+        ]);
+        dungeonPars = await parsRes.json();
+        const teamsData = await teamsRes.json();
+        teamNumberMap = {};
+        for (const t of teamsData) {
+          teamNumberMap[t.name] = t.id;
+        }
+
+        await loadRuns();
+      } catch (err) {
+        console.error('Failed to load data:', err);
+        runsContainer.innerHTML = '<div class="error-message">Failed to load data</div>';
+      }
+    }
+
+    async function loadRuns() {
+      const filter = teamFilter.value;
+      const url = filter ? `/api/all-runs?team=${encodeURIComponent(filter)}` : '/api/all-runs';
+
+      try {
+        const res = await fetch(url);
+        allRuns = await res.json();
+        populateTeamFilter();
+        renderRuns();
+      } catch (err) {
+        console.error('Failed to load runs:', err);
+      }
+    }
+
+    function populateTeamFilter() {
+      const currentValue = teamFilter.value;
+      // Only repopulate if showing all teams (to get full list)
+      if (currentValue) return;
+
+      const teams = Object.keys(allRuns).sort();
+      teamFilter.innerHTML = '<option value="">All Teams</option>';
+      teams.forEach(team => {
+        const option = document.createElement('option');
+        option.value = team;
+        option.textContent = team;
+        teamFilter.appendChild(option);
+      });
+    }
+
+    function slugifyDungeon(name) {
+      return String(name || '')
+        .toLowerCase()
+        .trim()
+        .replace(/['`]/g, "'")
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+
+    function getParTime(dungeonName) {
+      const slug = slugifyDungeon(dungeonName);
+      return dungeonPars[slug] || null;
+    }
+
+    function renderRuns() {
+      const teamNames = Object.keys(allRuns).sort();
+
+      if (teamNames.length === 0) {
+        runsContainer.innerHTML = '<div class="empty-message">No completed runs yet</div>';
+        return;
+      }
+
+      let html = '';
+
+      for (const team of teamNames) {
+        const runs = allRuns[team];
+        if (!runs || runs.length === 0) continue;
+
+        // Sort by level desc, then duration asc
+        const sorted = [...runs].sort((a, b) => {
+          if (b.level !== a.level) return b.level - a.level;
+          return (a.duration_ms || 0) - (b.duration_ms || 0);
+        });
+
+        html += `
+          <div class="dungeon-section">
+            <h2 class="section-title">Team ${teamNumberMap[team] ?? '?'}: ${escapeHtml(team)}<span class="team-run-count">${sorted.length} run${sorted.length !== 1 ? 's' : ''}</span></h2>
+            <table class="teams-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">#</th>
+                  <th style="width: 180px;">Dungeon</th>
+                  <th style="width: 60px;">Level</th>
+                  <th>Time</th>
+                  <th style="width: 32px;" class="upgrade-col one-star" title="+1 upgrade">&#9733;</th>
+                  <th style="width: 32px;" class="upgrade-col two-star" title="+2 upgrade">&#9733;&#9733;</th>
+                  <th style="width: 32px;" class="upgrade-col three-star" title="+3 upgrade">&#9733;&#9733;&#9733;</th>
+                  <th style="width: 50px;">Pts</th>
+                  <th style="width: 50px;">Deaths</th>
+                  <th style="width: 70px;">Extra High</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        sorted.forEach((run, index) => {
+          const rank = index + 1;
+          const parTime = getParTime(run.dungeon);
+          const timeBar = renderTimeBar(run.duration_ms, parTime, run.upgrades, run.boss_kills);
+
+          html += `
+            <tr>
+              <td class="rank-cell">${rank}</td>
+              <td class="team-name-cell">${escapeHtml(run.dungeon)}</td>
+              <td class="level-cell">+${run.level}</td>
+              <td>${timeBar}</td>
+              <td class="upgrade-col ${run.upgrades >= 1 ? 'one-star' : 'inactive'}">${run.upgrades >= 1 ? '&#9733;' : '&#9734;'}</td>
+              <td class="upgrade-col ${run.upgrades >= 2 ? 'two-star' : 'inactive'}">${run.upgrades >= 2 ? '&#9733;' : '&#9734;'}</td>
+              <td class="upgrade-col ${run.upgrades >= 3 ? 'three-star' : 'inactive'}">${run.upgrades >= 3 ? '&#9733;' : '&#9734;'}</td>
+              <td class="points-cell">${run.points}</td>
+              <td class="deaths-cell ${run.deaths === 0 ? 'zero' : ''}">${run.deaths || 0}</td>
+              <td class="extra-high-cell ${run.points === 0 && run.upgrades > 0 ? 'active' : 'inactive'}">${run.points === 0 && run.upgrades > 0 ? '!!' : '-'}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      runsContainer.innerHTML = html;
+    }
+
+    teamFilter.addEventListener('change', loadRuns);
+
+    function renderTimeBar(durationMs, parTime, upgrades, bossKills) {
+      if (!durationMs || durationMs <= 0 || !parTime) {
+        return `<div class="time-bar-container">
+          <div class="time-bar"><div class="time-bar-fill depleted" style="width: 100%;"></div></div>
+          <span class="time-text">--:--</span>
+        </div>`;
+      }
+
+      const percentage = (durationMs / parTime) * 100;
+      const displayPercentage = Math.min(percentage, 110);
+
+      let colorClass = 'depleted';
+      if (upgrades >= 3) colorClass = 'three';
+      else if (upgrades >= 2) colorClass = 'two';
+      else if (upgrades >= 1) colorClass = 'one';
+
+      const timeStr = formatDuration(durationMs);
+
+      let bossMarkersHtml = '';
+      if (bossKills && Array.isArray(bossKills) && bossKills.length > 0) {
+        bossKills.forEach((killMs, idx) => {
+          const bossPercentage = (killMs / parTime) * 100;
+          if (bossPercentage <= 110) {
+            const bossTime = formatDuration(killMs);
+            bossMarkersHtml += `
+              <div class="boss-marker" style="left: ${bossPercentage}%;">
+                <span class="boss-label">B${idx + 1}</span>
+                <span class="boss-tooltip">Boss ${idx + 1}: ${bossTime}</span>
+              </div>
+            `;
+          }
+        });
+      }
+
+      return `<div class="time-bar-container">
+        <div class="time-bar">
+          <div class="time-bar-markers">
+            <div class="time-bar-marker m60" title="+3 threshold (60%)"></div>
+            <div class="time-bar-marker m80" title="+2 threshold (80%)"></div>
+            <div class="time-bar-marker m100" title="Par time (100%)"></div>
+            ${bossMarkersHtml}
+          </div>
+          <div class="time-bar-fill ${colorClass}" style="width: ${displayPercentage}%;"></div>
+        </div>
+        <span class="time-text">${timeStr}</span>
+      </div>`;
+    }
+
+    function formatDuration(ms) {
+      if (!ms || ms <= 0) return '--:--';
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
+    if (client.isConnected()) {
+      loadData();
+    }
+  </script>
+</body>
+</html>

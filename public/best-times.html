@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M+ Tournament - Best Times</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/theme.css">
+  <style>
+    .public-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      font-family: var(--font-sans);
+    }
+
+    .public-header {
+      text-align: center;
+      margin-bottom: var(--spacing-xl);
+      padding-bottom: var(--spacing-lg);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .public-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .public-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .last-updated {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: var(--spacing-sm);
+      font-family: var(--font-mono);
+    }
+
+    .next-update {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: var(--spacing-xs);
+      font-family: var(--font-mono);
+    }
+
+    .logo-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: var(--spacing-md);
+    }
+
+    .logo-container img {
+      max-width: 120px;
+      max-height: 120px;
+    }
+
+    /* View tabs */
+    .view-tabs {
+      display: inline-flex;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-md);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-xs);
+    }
+
+    .view-tab {
+      padding: var(--spacing-sm) var(--spacing-lg);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+    }
+
+    .view-tab:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+
+    .view-tab.active {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    /* Dungeon selector buttons */
+    .dungeon-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-sm);
+      justify-content: center;
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .dungeon-selector .dungeon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--spacing-sm) var(--spacing-lg);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .dungeon-selector .dungeon-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .dungeon-selector .dungeon-btn.active {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      border-color: #3b82f6;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+    }
+
+    /* Table-based dungeon sections */
+    .dungeon-section {
+      margin-bottom: var(--spacing-xl);
+      border-radius: 0;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: var(--spacing-md);
+      padding-bottom: var(--spacing-sm);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .teams-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .teams-table th {
+      text-align: left;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: var(--spacing-sm) var(--spacing-sm);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .teams-table td {
+      padding: var(--spacing-sm) var(--spacing-sm);
+      vertical-align: middle;
+    }
+
+    .teams-table tbody tr:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .rank-cell {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .rank-cell.first { color: #ffd700; }
+    .rank-cell.second { color: #c0c0c0; }
+    .rank-cell.third { color: #cd7f32; }
+
+    .level-cell {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--accent-yellow);
+    }
+
+    .team-name-cell {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 180px;
+    }
+
+    /* Time bar */
+    .time-bar-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    .time-bar {
+      flex: 1;
+      height: 24px;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+      overflow: visible;
+      position: relative;
+    }
+    .time-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .time-bar-fill.three { background: var(--accent-yellow); }
+    .time-bar-fill.two { background: var(--accent-purple); }
+    .time-bar-fill.one { background: var(--accent-green); }
+    .time-bar-fill.depleted { background: var(--accent-red); }
+
+    .time-bar-markers {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+    .time-bar-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+    .time-bar-marker.m60 { left: 60%; }
+    .time-bar-marker.m80 { left: 80%; }
+    .time-bar-marker.m100 { left: 100%; background: rgba(255, 255, 255, 0.8); }
+
+    /* Boss markers on bar */
+    .boss-marker {
+      position: absolute;
+      top: -4px;
+      bottom: -4px;
+      width: 16px;
+      margin-left: -6px;
+      background: transparent;
+      border-radius: 2px;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .boss-marker::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 3px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 2px;
+    }
+    .boss-marker:hover::after {
+      background: #fff;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+    }
+    .boss-marker:hover .boss-tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+    .boss-label {
+      position: absolute;
+      top: -18px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+    .boss-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s ease;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .time-text {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      min-width: 50px;
+      text-align: right;
+    }
+
+    /* Chest column */
+    .chest-cell {
+      text-align: center;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .chest-cell.three { color: #ff8000; }
+    .chest-cell.two { color: #a335ee; }
+    .chest-cell.one { color: #1eff00; }
+    .chest-cell.depleted { color: var(--text-muted); }
+
+    .points-cell {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--accent-green);
+    }
+
+    .deaths-cell {
+      font-family: var(--font-mono);
+      color: var(--accent-red);
+    }
+    .deaths-cell.zero { color: var(--text-secondary); }
+
+    /* Dungeon section header (All mode) */
+    .bt-dungeon-section-header {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: var(--spacing-sm) var(--spacing-lg);
+      background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, transparent 100%);
+      border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      margin-top: var(--spacing-md);
+    }
+
+    .bt-dungeon-section-header:first-child {
+      margin-top: 0;
+    }
+
+    .bt-no-data {
+      text-align: center;
+      padding: var(--spacing-xl);
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="public-container">
+    <header class="public-header">
+      <div class="logo-container">
+        <img src="/images/luckywipelogo.png" alt="Tournament Logo">
+      </div>
+      <h1 class="public-title">M+ Tournament Best Times</h1>
+      <p class="public-subtitle">Live standings updated automatically</p>
+      <div class="last-updated" id="lastUpdated">Last updated: --:--</div>
+      <div class="next-update" id="nextUpdate">Next update in: --:--</div>
+      <div class="view-tabs">
+        <a class="view-tab" href="/leaderboard.html">Leaderboard</a>
+        <a class="view-tab active" href="/best-times.html">Best Times</a>
+      </div>
+    </header>
+
+    <div id="bestTimesView">
+      <div class="dungeon-selector" id="dungeonSelector"></div>
+      <div id="bestTimesBody"><div class="bt-no-data">Loading...</div></div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script>
+    const client = initTournamentClient();
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+    const nextUpdateEl = document.getElementById('nextUpdate');
+    const dungeonSelectorEl = document.getElementById('dungeonSelector');
+    const bestTimesBodyEl = document.getElementById('bestTimesBody');
+
+    let pollCountdownInterval = null;
+    let nextPollTime = null;
+
+    // Best Times state
+    let btBestTimes = {};
+    let btShortNameMap = {};
+    let btDungeonPars = {};
+    let btAllDungeonNames = [];
+    let btSelectedDungeon = null;
+
+    function slugifyDungeon(name) {
+      return String(name || '')
+        .toLowerCase()
+        .trim()
+        .replace(/['`]/g, "'")
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+
+    function getBtShortName(dungeonName) {
+      const slug = slugifyDungeon(dungeonName);
+      return btShortNameMap[slug] || dungeonName.substring(0, 4).toUpperCase();
+    }
+
+    function getBtParTime(dungeonName) {
+      const slug = slugifyDungeon(dungeonName);
+      return btDungeonPars[slug] || null;
+    }
+
+    async function initBestTimes() {
+      try {
+        const [shortNamesRes, bestTimesRes, parsRes] = await Promise.all([
+          fetch('/api/dungeon-short-names'),
+          fetch('/api/best-times'),
+          fetch('/api/dungeon-pars')
+        ]);
+        btShortNameMap = await shortNamesRes.json();
+        btBestTimes = await bestTimesRes.json();
+        btDungeonPars = await parsRes.json();
+
+        btAllDungeonNames = Object.keys(btBestTimes).sort();
+        if (!btSelectedDungeon && btAllDungeonNames.length > 0) {
+          btSelectedDungeon = '__ALL__';
+        }
+
+        renderDungeonButtons();
+        renderBestTimes();
+      } catch (err) {
+        console.error('Failed to initialize best times:', err);
+      }
+    }
+
+    function selectDungeon(dungeonName) {
+      btSelectedDungeon = dungeonName;
+      renderDungeonButtons();
+      renderBestTimes();
+    }
+
+    function renderDungeonButtons() {
+      if (btAllDungeonNames.length === 0) {
+        dungeonSelectorEl.innerHTML = '<span style="color: var(--text-muted);">No data yet</span>';
+        return;
+      }
+      const allBtn = `<button class="dungeon-btn ${btSelectedDungeon === '__ALL__' ? 'active' : ''}" data-dungeon="__ALL__">ALL</button>`;
+      const dungeonBtns = btAllDungeonNames.map(name => {
+        const shortName = getBtShortName(name);
+        const isActive = name === btSelectedDungeon;
+        return `<button class="dungeon-btn ${isActive ? 'active' : ''}" data-dungeon="${escapeHtml(name)}">${shortName}</button>`;
+      }).join('');
+      dungeonSelectorEl.innerHTML = allBtn + dungeonBtns;
+      dungeonSelectorEl.querySelectorAll('.dungeon-btn').forEach(btn => {
+        btn.addEventListener('click', () => selectDungeon(btn.dataset.dungeon));
+      });
+    }
+
+    function getBestRunPerTeam(runs) {
+      const teamBest = {};
+      for (const run of runs) {
+        const team = run.team;
+        if (!teamBest[team]) {
+          teamBest[team] = run;
+        } else {
+          const current = teamBest[team];
+          if (run.level > current.level ||
+              (run.level === current.level && run.duration_ms < current.duration_ms)) {
+            teamBest[team] = run;
+          }
+        }
+      }
+      return Object.values(teamBest);
+    }
+
+    function renderDungeonTable(dungeonName) {
+      const allRuns = btBestTimes[dungeonName] || [];
+      if (allRuns.length === 0) return '';
+
+      const teamBestRuns = getBestRunPerTeam(allRuns);
+
+      teamBestRuns.sort((a, b) => {
+        if (b.level !== a.level) return b.level - a.level;
+        return (a.duration_ms || 0) - (b.duration_ms || 0);
+      });
+
+      const parTime = getBtParTime(dungeonName);
+
+      let rowsHtml = '';
+      teamBestRuns.forEach((run, index) => {
+        const rank = index + 1;
+        const rankClass = rank === 1 ? 'first' : rank === 2 ? 'second' : rank === 3 ? 'third' : '';
+        const timeBar = renderTimeBar(run.duration_ms, parTime, run.upgrades, run.boss_kills);
+        const chest = renderChest(run.upgrades);
+
+        rowsHtml += `
+          <tr>
+            <td class="rank-cell ${rankClass}">${rank}</td>
+            <td class="level-cell">+${run.level}</td>
+            <td class="team-name-cell">${escapeHtml(run.team)}</td>
+            <td>${timeBar}</td>
+            <td class="${chest.cssClass}">${chest.text}</td>
+            <td class="points-cell">${run.points || 0}</td>
+            <td class="deaths-cell ${(run.deaths || 0) === 0 ? 'zero' : ''}">${run.deaths || 0}</td>
+          </tr>
+        `;
+      });
+
+      return `
+        <div class="dungeon-section">
+          <table class="teams-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;">#</th>
+                <th style="width: 60px;">Level</th>
+                <th style="width: 180px;">Team</th>
+                <th>Time</th>
+                <th style="width: 70px; text-align: center;">Chest</th>
+                <th style="width: 50px;">Pts</th>
+                <th style="width: 50px;">Deaths</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderBestTimes() {
+      if (!btSelectedDungeon) {
+        bestTimesBodyEl.innerHTML = '<div class="bt-no-data">Select a dungeon</div>';
+        return;
+      }
+
+      if (btSelectedDungeon === '__ALL__') {
+        const sections = btAllDungeonNames.map(dungeonName => {
+          const tableHtml = renderDungeonTable(dungeonName);
+          if (!tableHtml) return '';
+          return `<div class="bt-dungeon-section-header">${escapeHtml(dungeonName)}</div>${tableHtml}`;
+        }).join('');
+
+        if (!sections) {
+          bestTimesBodyEl.innerHTML = '<div class="bt-no-data">No timed runs yet</div>';
+          return;
+        }
+        bestTimesBodyEl.innerHTML = sections;
+        return;
+      }
+
+      const tableHtml = renderDungeonTable(btSelectedDungeon);
+      if (!tableHtml) {
+        bestTimesBodyEl.innerHTML = '<div class="bt-no-data">No timed runs for this dungeon yet</div>';
+        return;
+      }
+      bestTimesBodyEl.innerHTML = tableHtml;
+    }
+
+    function renderChest(upgrades) {
+      if (upgrades >= 3) return { text: '★★★', cssClass: 'chest-cell three' };
+      if (upgrades >= 2) return { text: '★★', cssClass: 'chest-cell two' };
+      if (upgrades >= 1) return { text: '★', cssClass: 'chest-cell one' };
+      return { text: '-', cssClass: 'chest-cell depleted' };
+    }
+
+    function renderTimeBar(durationMs, parTime, upgrades, bossKills) {
+      if (!durationMs || durationMs <= 0 || !parTime) {
+        return `<div class="time-bar-container">
+          <div class="time-bar"><div class="time-bar-fill depleted" style="width: 100%;"></div></div>
+          <span class="time-text">--:--</span>
+        </div>`;
+      }
+
+      const percentage = (durationMs / parTime) * 100;
+      const displayPercentage = Math.min(percentage, 110);
+
+      let colorClass = 'depleted';
+      if (upgrades >= 3) colorClass = 'three';
+      else if (upgrades >= 2) colorClass = 'two';
+      else if (upgrades >= 1) colorClass = 'one';
+
+      const timeStr = formatBtDuration(durationMs);
+
+      let bossMarkersHtml = '';
+      if (bossKills && Array.isArray(bossKills) && bossKills.length > 0) {
+        bossKills.forEach((killMs, idx) => {
+          const bossPercentage = (killMs / parTime) * 100;
+          if (bossPercentage <= 110) {
+            const bossTime = formatBtDuration(killMs);
+            bossMarkersHtml += `
+              <div class="boss-marker" style="left: ${bossPercentage}%;">
+                <span class="boss-label">B${idx + 1}</span>
+                <span class="boss-tooltip">Boss ${idx + 1}: ${bossTime}</span>
+              </div>
+            `;
+          }
+        });
+      }
+
+      return `<div class="time-bar-container">
+        <div class="time-bar">
+          <div class="time-bar-markers">
+            <div class="time-bar-marker m60" title="+3 threshold (60%)"></div>
+            <div class="time-bar-marker m80" title="+2 threshold (80%)"></div>
+            <div class="time-bar-marker m100" title="Par time (100%)"></div>
+            ${bossMarkersHtml}
+          </div>
+          <div class="time-bar-fill ${colorClass}" style="width: ${displayPercentage}%;"></div>
+        </div>
+        <span class="time-text">${timeStr}</span>
+      </div>`;
+    }
+
+    function formatBtDuration(ms) {
+      if (!ms || ms <= 0) return '--:--';
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    async function refreshBestTimes() {
+      try {
+        const res = await fetch('/api/best-times');
+        btBestTimes = await res.json();
+        const newNames = Object.keys(btBestTimes).sort();
+        if (newNames.length !== btAllDungeonNames.length) {
+          btAllDungeonNames = newNames;
+          if (btSelectedDungeon !== '__ALL__' && !btAllDungeonNames.includes(btSelectedDungeon) && btAllDungeonNames.length > 0) {
+            btSelectedDungeon = '__ALL__';
+          }
+          renderDungeonButtons();
+        }
+        renderBestTimes();
+      } catch (err) {
+        console.error('Failed to refresh best times:', err);
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
+    // Socket events
+    client.on('state:sync', (state) => {
+      updateLastUpdated(state.lastPollTime);
+      if (state.lastPollTime && state.nextPollMs) {
+        const elapsed = Date.now() - state.lastPollTime;
+        const remaining = Math.max(0, state.nextPollMs - elapsed);
+        startPollCountdown(remaining);
+      }
+    });
+
+    client.on('scoreboard:update', () => {
+      updateLastUpdated(Date.now());
+      refreshBestTimes();
+    });
+
+    client.on('poll:complete', (data) => {
+      updateLastUpdated(data.time);
+      startPollCountdown(data.nextPollMs || 30000);
+      refreshBestTimes();
+    });
+
+    function updateLastUpdated(time) {
+      if (!time) {
+        lastUpdatedEl.textContent = 'Last updated: --:--';
+        return;
+      }
+      const date = new Date(time);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      lastUpdatedEl.textContent = `Last updated: ${hours}:${minutes}:${seconds}`;
+    }
+
+    function startPollCountdown(intervalMs) {
+      nextPollTime = Date.now() + intervalMs;
+
+      if (pollCountdownInterval) clearInterval(pollCountdownInterval);
+
+      function updateCountdown() {
+        const remaining = Math.max(0, nextPollTime - Date.now());
+
+        if (remaining <= 0) {
+          clearInterval(pollCountdownInterval);
+          pollCountdownInterval = null;
+          nextUpdateEl.textContent = 'Updating...';
+          return;
+        }
+
+        const seconds = Math.ceil(remaining / 1000);
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        nextUpdateEl.textContent = `Next update in: ${mins}:${secs.toString().padStart(2, '0')}`;
+      }
+
+      updateCountdown();
+      pollCountdownInterval = setInterval(updateCountdown, 1000);
+    }
+
+    // Initialize immediately
+    initBestTimes();
+  </script>
+</body>
+</html>

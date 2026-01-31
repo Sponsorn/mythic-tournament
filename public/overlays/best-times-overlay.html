@@ -448,11 +448,7 @@
       const html = allDungeonNames.map(name => {
         const shortName = getShortName(name);
         const isActive = name === selectedDungeon;
-        return `
-          <button class="dungeon-btn ${isActive ? 'active' : ''}" data-dungeon="${escapeHtml(name)}">
-            ${shortName}
-          </button>
-        `;
+        return `<button class="dungeon-btn ${isActive ? 'active' : ''}" data-dungeon="${escapeHtml(name)}">${shortName}</button>`;
       }).join('');
 
       dungeonButtonsEl.innerHTML = html;

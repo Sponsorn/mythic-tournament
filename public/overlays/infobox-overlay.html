@@ -105,10 +105,19 @@
 
     /* Description Text */
     .info-description {
-      font-size: 16px;
+      font-size: 32px;
       line-height: 1.6;
-      color: var(--text-secondary);
+      color: var(--text-primary);
       padding: var(--spacing-md);
+      text-align: center;
+    }
+    
+    .info-description-subtle{
+      font-size: 26px;
+      line-height: 1.6;
+      color: var(--text-muted);
+      padding: var(--spacing-md);
+      text-align: center;
     }
 
     /* Footer */
@@ -125,18 +134,18 @@
 <body>
   <div class="infobox-container">
     <header class="infobox-header">
-      <div class="infobox-title">Info Box Title</div>
-      <div class="infobox-subtitle">Subtitle or description goes here</div>
+      <div class="infobox-title">Welcome to the stream</div>
+      <div class="infobox-subtitle">Tournament runs is going until 21:00 CET</div>
     </header>
 
-    <div class="infobox-body">
-      <!-- Large Stat Example -->
+    <!-- <div class="infobox-body">
+      // Large Stat Example 
       <div class="stat-block">
         <div class="stat-value">42</div>
         <div class="stat-label">Placeholder Stat</div>
-      </div>
+      </div> -->
 
-      <!-- Info Rows -->
+      <!-- Info Rows 
       <div class="info-row">
         <span class="info-label">Label One</span>
         <span class="info-value">Value 1</span>
@@ -150,17 +159,18 @@
       <div class="info-row">
         <span class="info-label">Label Three</span>
         <span class="info-value">00:00:00</span>
-      </div>
+      </div>-->
 
       <!-- Description -->
       <div class="info-description">
-        This is placeholder description text. You can add any information here that needs to be displayed in the info box overlay.
+        Lucky Wipe is organizing a Mythic+ Tournament for <br>guild members and friends <br>of the guild.<br><br> 
+        <div class="info-description-subtle">Commands you can write in chat to get more info: <br>!tournament, !guild, !join,<br> !streams, !teams</div>
       </div>
     </div>
 
-    <footer class="infobox-footer">
+    <!-- <footer class="infobox-footer">
       Footer text goes here
-    </footer>
+    </footer> -->
   </div>
 </body>
 </html>

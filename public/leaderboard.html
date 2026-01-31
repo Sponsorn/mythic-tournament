@@ -66,6 +66,41 @@
     .lb-columns {
       margin-bottom: var(--spacing-sm);
     }
+
+    /* View tabs */
+    .view-tabs {
+      display: inline-flex;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-md);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-xs);
+    }
+
+    .view-tab {
+      padding: var(--spacing-sm) var(--spacing-lg);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+    }
+
+    .view-tab:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+
+    .view-tab.active {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
   </style>
 </head>
 <body>
@@ -78,20 +113,26 @@
       <p class="public-subtitle">Live standings updated automatically</p>
       <div class="last-updated" id="lastUpdated">Last updated: --:--</div>
       <div class="next-update" id="nextUpdate">Next update in: --:--</div>
+      <div class="view-tabs">
+        <a class="view-tab active" href="/leaderboard.html">Leaderboard</a>
+        <a class="view-tab" href="/best-times.html">Best Times</a>
+      </div>
     </header>
 
-    <div class="lb-columns">
-      <div class="col-center">Rank</div>
-      <div>Team</div>
-      <div class="col-center">Team #</div>
-      <div class="col-center">Bracket</div>
-      <div class="col-center">Highest Key</div>
-      <div class="col-center">Runs</div>
-      <div class="col-right">Score</div>
-      <div class="col-center">Status</div>
-    </div>
-    <div class="lb-body" id="leaderboardBody">
-      <div class="lb-empty">Connecting...</div>
+    <div id="leaderboardView">
+      <div class="lb-columns">
+        <div class="col-center">Rank</div>
+        <div>Team</div>
+        <div class="col-center">Team #</div>
+        <div class="col-center">Bracket</div>
+        <div class="col-center">Highest Key</div>
+        <div class="col-center">Runs</div>
+        <div class="col-right">Score</div>
+        <div class="col-center">Status</div>
+      </div>
+      <div class="lb-body" id="leaderboardBody">
+        <div class="lb-empty">Connecting...</div>
+      </div>
     </div>
   </div>
 

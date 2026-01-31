@@ -113,6 +113,24 @@ function createWebServer(config = {}) {
     res.json(DUNGEON_SHORT_NAMES);
   });
 
+  app.get('/api/all-runs', (req, res) => {
+    const scores = readScoresAsObjects();
+    const teamFilter = req.query.team || null;
+    const teams = {};
+    for (const run of scores) {
+      if (!run.team) continue;
+      if (teamFilter && run.team !== teamFilter) continue;
+      if (!teams[run.team]) teams[run.team] = [];
+      teams[run.team].push(run);
+    }
+    for (const team of Object.keys(teams)) {
+      teams[team].sort((a, b) => {
+        return new Date(b.finished_at_realm) - new Date(a.finished_at_realm);
+      });
+    }
+    res.json(teams);
+  });
+
   // Team stats (highest key, total deaths, unique dungeons per team)
   app.get('/api/team-stats', (req, res) => {
     const scores = readScoresAsObjects();

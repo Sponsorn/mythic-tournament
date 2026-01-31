@@ -365,7 +365,7 @@ function getBestRunsPerDungeon(dungeonFilter = null) {
   const dungeons = {};
 
   for (const run of scores) {
-    if (!run.dungeon || !run.in_time) continue;
+    if (!run.dungeon || !run.in_time || !run.points) continue;
     if (dungeonFilter && run.dungeon !== dungeonFilter) continue;
 
     if (!dungeons[run.dungeon]) {

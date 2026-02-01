@@ -24,6 +24,7 @@ const SCORE_HEADER = [
   'deaths',
   'duration_ms',
   'boss_kills',
+  'potions_used',
   'character',
   'realm',
   'region',
@@ -350,6 +351,7 @@ function readScoresAsObjects() {
     obj.points = parseInt(obj.points, 10) || 0;
     obj.deaths = parseInt(obj.deaths, 10) || 0;
     obj.duration_ms = parseInt(obj.duration_ms, 10) || 0;
+    obj.potions_used = parseInt(obj.potions_used, 10) || 0;
     // Parse boss_kills as JSON array (e.g., "[120000,300000,450000]")
     try {
       obj.boss_kills = obj.boss_kills ? JSON.parse(obj.boss_kills) : [];
@@ -360,12 +362,13 @@ function readScoresAsObjects() {
   });
 }
 
-function getBestRunsPerDungeon(dungeonFilter = null) {
+function getBestRunsPerDungeon(dungeonFilter = null, includeAll = false) {
   const scores = readScoresAsObjects();
   const dungeons = {};
 
   for (const run of scores) {
-    if (!run.dungeon || !run.in_time || !run.points) continue;
+    if (!run.dungeon) continue;
+    if (!includeAll && (!run.in_time || !run.points)) continue;
     if (dungeonFilter && run.dungeon !== dungeonFilter) continue;
 
     if (!dungeons[run.dungeon]) {

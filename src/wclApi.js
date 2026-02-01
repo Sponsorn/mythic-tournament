@@ -60,6 +60,13 @@ async function wclGraphql(query, variables) {
   if (!res.ok || body.errors || !body.data) {
     throw new Error(`WCL GQL error ${res.status}: ${JSON.stringify(body)}`);
   }
+
+  // Attach rate limit info from WCL response if available
+  const rateLimitData = body.extensions?.rateLimitData || null;
+  if (rateLimitData) {
+    body.data.__rateLimitData = rateLimitData;
+  }
+
   return body.data;
 }
 
@@ -97,7 +104,8 @@ async function wclFetchReportMplusFights(code) {
   }
   const fights = (report.fights || []).filter(f => f.keystoneLevel);
   const actors = report.masterData?.actors || [];
-  return { report, fights, actors };
+  const rateLimitData = data.__rateLimitData || null;
+  return { report, fights, actors, rateLimitData };
 }
 
 /**
@@ -245,10 +253,43 @@ async function wclCountDeathsForFight(code, fightId) {
   }
 }
 
+async function wclCountPotionsForFight(code, fightId, potionSpellIds) {
+  if (!Array.isArray(potionSpellIds) || !potionSpellIds.length) return 0;
+  let total = 0;
+  for (const spellId of potionSpellIds) {
+    const query = `
+      query($code: String!, $fid: Int!, $abilityID: Float!) {
+        reportData {
+          report(code: $code) {
+            events(
+              dataType: Casts,
+              fightIDs: [$fid],
+              hostilityType: Friendlies,
+              abilityID: $abilityID,
+              limit: 10000
+            ) { data }
+          }
+        }
+      }`;
+    try {
+      const data = await wclGraphql(query, { code, fid: Number(fightId), abilityID: Number(spellId) });
+      const arr = data.reportData?.report?.events?.data;
+      if (Array.isArray(arr)) {
+        total += arr.length;
+      }
+    } catch (err) {
+      console.warn(`[WCL] Failed to fetch potion casts for spell=${spellId} fight=${fightId}: ${err.message || err}`);
+    }
+  }
+  return total;
+}
+
 module.exports = {
   wclExtractCode,
+  wclGraphql,
   wclFetchReportMplusFights,
   wclFetchBossKillTimes,
   wclCountDeathsForFight,
+  wclCountPotionsForFight,
   makeAbsMs,
 };

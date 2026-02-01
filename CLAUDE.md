@@ -61,6 +61,10 @@ Required: `WCL_CLIENT_ID`, `WCL_CLIENT_SECRET`
 
 Web server defaults to port 3000 (`WEB_PORT`). Polling intervals controlled by `POLL_INTERVAL_ACTIVE_MS` (30s) and `POLL_INTERVAL_IDLE_MS` (5min).
 
+## Changelog
+
+When making changes to the codebase, always update `CHANGELOG.md` with a summary of what changed. Add entries under the current date, grouped by category (Bug Fixes, Improvements, Configuration, New Files, etc.). Newest entries go at the top of the file.
+
 ## Data Storage
 
 - `data/wcl.json` - Teams array (with bracket field), `leaderboardWcl` object (team→points), `wclMeta` (run counts), `seenWcl` (deduplication)

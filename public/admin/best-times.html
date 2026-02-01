@@ -279,7 +279,8 @@
 
     async function loadBestTimes() {
       const filter = dungeonFilter.value;
-      const url = filter ? `/api/best-times?dungeon=${encodeURIComponent(filter)}` : '/api/best-times';
+      const base = '/api/best-times';
+      const url = filter ? `${base}?dungeon=${encodeURIComponent(filter)}` : base;
 
       try {
         const res = await fetch(url);

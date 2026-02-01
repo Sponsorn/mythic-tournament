@@ -52,6 +52,12 @@ const EVENT_ENFORCE_WINDOW = parseBoolEnv('EVENT_ENFORCE_WINDOW', false);
 const MPLUS_DEATH_PENALTY_LT12 = parseIntEnv('MPLUS_DEATH_PENALTY_LT12', 5, 0, 300);
 const MPLUS_DEATH_PENALTY_GE12 = parseIntEnv('MPLUS_DEATH_PENALTY_GE12', 15, 0, 300);
 
+// Potion Tracking Configuration
+const WCL_POTION_SPELL_IDS = (getStringEnv('WCL_POTION_SPELL_IDS', '431932'))
+  .split(',')
+  .map(s => Number(s.trim()))
+  .filter(n => Number.isFinite(n) && n > 0);
+
 // Web Server Configuration
 const WEB_PORT = parseIntEnv('WEB_PORT', 3000, 1, 65535);
 const WEB_HOST = getStringEnv('WEB_HOST', '0.0.0.0');
@@ -90,18 +96,28 @@ function hasWclCredentials() {
   return Boolean(WCL_CLIENT_ID && WCL_CLIENT_SECRET);
 }
 
+// Runtime config accessor - returns runtime value if set, else env/default
+const runtimeConfig = require('./runtimeConfig');
+
+function getRuntimeOrEnv(runtimeKey, envValue) {
+  const rtVal = runtimeConfig.get(runtimeKey);
+  // Use runtime value only if it has been explicitly set (non-empty for strings, defined for others)
+  if (rtVal !== undefined && rtVal !== '' && rtVal !== null) return rtVal;
+  return envValue;
+}
+
 module.exports = {
   // Warcraft Logs
   WCL_CLIENT_ID,
   WCL_CLIENT_SECRET,
   WCL_POLL_INTERVAL_MINUTES,
-  WCL_REQUIRE_KILL,
+  get WCL_REQUIRE_KILL() { return getRuntimeOrEnv('requireKill', WCL_REQUIRE_KILL); },
   WCL_TOKEN_URL,
   WCL_GQL_CLIENT,
 
-  // Event Window
-  EVENT_START_SE,
-  EVENT_END_SE,
+  // Event Window - use runtime config if set
+  get EVENT_START_SE() { return getRuntimeOrEnv('eventStartSE', EVENT_START_SE); },
+  get EVENT_END_SE() { return getRuntimeOrEnv('eventEndSE', EVENT_END_SE); },
   EVENT_ENFORCE_WINDOW,
 
   // M+ Scoring
@@ -109,11 +125,14 @@ module.exports = {
   MPLUS_DEATH_PENALTY_GE12,
   MPLUS_START_OFFSET_MS,
 
+  // Potion Tracking
+  WCL_POTION_SPELL_IDS,
+
   // Web Server
   WEB_PORT,
   WEB_HOST,
-  POLL_INTERVAL_ACTIVE_MS,
-  POLL_INTERVAL_IDLE_MS,
+  get POLL_INTERVAL_ACTIVE_MS() { return getRuntimeOrEnv('pollIntervalActiveMs', POLL_INTERVAL_ACTIVE_MS); },
+  get POLL_INTERVAL_IDLE_MS() { return getRuntimeOrEnv('pollIntervalIdleMs', POLL_INTERVAL_IDLE_MS); },
   CORS_ORIGINS,
   ADMIN_SECRET,
   OBS_WS_PORT,

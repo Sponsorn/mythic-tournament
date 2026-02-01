@@ -63,7 +63,7 @@ class StateManager extends EventEmitter {
     const scores = readScoresAsObjects();
     const runCounts = {};
     for (const run of scores) {
-      if (run.team) {
+      if (run.team && (run.in_time || run.points > 0)) {
         runCounts[run.team] = (runCounts[run.team] || 0) + 1;
       }
     }
@@ -232,6 +232,28 @@ class StateManager extends EventEmitter {
     this.emit('scoreboard:update', this.state.leaderboard);
   }
 
+  // Check for stale/abandoned runs (running longer than 2x par time)
+  checkStaleRuns() {
+    const now = Date.now();
+    const staleRuns = this.state.activeRuns.filter(run => {
+      const elapsed = now - run.startTime;
+      const maxTime = (run.parTime || 1800000) * 2;
+      return elapsed > maxTime;
+    });
+
+    for (const run of staleRuns) {
+      console.log(`[StateManager] Auto-clearing stale run for ${run.teamName} (elapsed ${Math.round((now - run.startTime) / 60000)}m, par ${Math.round((run.parTime || 1800000) / 60000)}m)`);
+      this.state.activeRuns = this.state.activeRuns.filter(r => r.teamName !== run.teamName);
+      this.updateTeamStatus(run.teamName, 'idle');
+    }
+
+    if (staleRuns.length > 0) {
+      this.emit('activeRuns:update', this.state.activeRuns);
+    }
+
+    return staleRuns.length;
+  }
+
   updateTeamStatus(teamName, status) {
     const team = this.state.teams.find(t => t.name === teamName);
     if (team) {
@@ -245,24 +267,29 @@ class StateManager extends EventEmitter {
     }
   }
 
-  // Track API quota
-  recordApiRequest() {
-    const now = Date.now();
+  // Track API quota using real WCL rate limit data when available
+  recordApiRequest(rateLimitData) {
+    if (rateLimitData) {
+      // Use actual WCL rate limit info
+      const pointsSpentThisSecond = Number(rateLimitData.pointsSpentThisSecond || 0);
+      const limitPerSecond = Number(rateLimitData.limitPerSecond || 100);
+      const pointsResetIn = Number(rateLimitData.pointsResetIn || 0);
 
-    // Reset if hour has passed
-    if (now >= this.state.apiQuota.resetTime) {
-      this.quotaRequests = [];
-      this.state.apiQuota.resetTime = now + 3600000;
+      this.state.apiQuota.used = Math.round(pointsSpentThisSecond);
+      this.state.apiQuota.limit = Math.round(limitPerSecond);
+      this.state.apiQuota.resetTime = Date.now() + (pointsResetIn * 1000);
+    } else {
+      // Fallback: local counting
+      const now = Date.now();
+      if (now >= this.state.apiQuota.resetTime) {
+        this.quotaRequests = [];
+        this.state.apiQuota.resetTime = now + 3600000;
+      }
+      this.quotaRequests.push(now);
+      const oneHourAgo = now - 3600000;
+      this.quotaRequests = this.quotaRequests.filter(t => t > oneHourAgo);
+      this.state.apiQuota.used = this.quotaRequests.length;
     }
-
-    // Add request timestamp
-    this.quotaRequests.push(now);
-
-    // Prune old requests (older than 1 hour)
-    const oneHourAgo = now - 3600000;
-    this.quotaRequests = this.quotaRequests.filter(t => t > oneHourAgo);
-
-    this.state.apiQuota.used = this.quotaRequests.length;
 
     this.emit('quota:update', this.state.apiQuota);
   }

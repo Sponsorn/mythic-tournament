@@ -3,6 +3,7 @@ const { collectRunsAndSync } = require('./wclCollector');
 const { ensureFiles: ensureWclFiles } = require('./wclStorage');
 const { createWebServer, setForceRefreshCallback } = require('./webServer');
 const stateManager = require('./stateManager');
+const logger = require('./logger');
 const {
   WEB_PORT,
   WEB_HOST,
@@ -82,10 +83,10 @@ async function pollWclRuns() {
     return;
   }
 
-  // Track API request
-  stateManager.recordApiRequest();
+  const { privateMsgs, newCount, completedRuns, rateLimitData } = await collectRunsAndSync();
 
-  const { privateMsgs, newCount, completedRuns } = await collectRunsAndSync();
+  // Track API request with real rate limit data when available
+  stateManager.recordApiRequest(rateLimitData);
 
   // Update state manager
   stateManager.refreshTeams();
@@ -102,15 +103,18 @@ async function pollWclRuns() {
     stateManager.emit('scoreboard:update', stateManager.getLeaderboard());
   }
 
+  // Check for stale/abandoned runs
+  stateManager.checkStaleRuns();
+
   // Log poll results
   if (privateMsgs.length) {
     for (const msg of privateMsgs) {
-      console.log(msg);
+      logger.info('WCL', msg);
     }
   }
 
   if (newCount > 0) {
-    console.log(`[Main] Poll complete: ${newCount} new run(s) detected`);
+    logger.info('Main', `Poll complete: ${newCount} new run(s) detected`);
   }
 }
 

@@ -229,6 +229,8 @@
     let allRuns = {};
     let dungeonPars = {};
     let teamNumberMap = {};
+    const EXTRA_HIGH_THRESHOLDS = { A: 22, B: 23, C: 24, D: 25 };
+    let teamBracketMap = {};
 
     client.on('connected', () => {
       connectionBadge.classList.add('connected');
@@ -254,6 +256,7 @@
         teamNumberMap = {};
         for (const t of teamsData) {
           teamNumberMap[t.name] = t.id;
+          teamBracketMap[t.name] = t.bracket;
         }
 
         await loadRuns();
@@ -323,6 +326,8 @@
         if (!runs || runs.length === 0) continue;
 
         // Sort by level desc, then duration asc
+        const extraHighMin = EXTRA_HIGH_THRESHOLDS[teamBracketMap[team]] || 22;
+
         const sorted = [...runs].sort((a, b) => {
           if (b.level !== a.level) return b.level - a.level;
           return (a.duration_ms || 0) - (b.duration_ms || 0);
@@ -365,7 +370,7 @@
               <td class="upgrade-col ${run.upgrades >= 3 ? 'three-star' : 'inactive'}">${run.upgrades >= 3 ? '&#9733;' : '&#9734;'}</td>
               <td class="points-cell">${run.points}</td>
               <td class="deaths-cell ${run.deaths === 0 ? 'zero' : ''}">${run.deaths || 0}</td>
-              <td class="extra-high-cell ${run.points === 0 && run.upgrades > 0 ? 'active' : 'inactive'}">${run.points === 0 && run.upgrades > 0 ? '!!' : '-'}</td>
+              <td class="extra-high-cell ${run.upgrades > 0 && run.level >= extraHighMin ? 'active' : 'inactive'}">${run.upgrades > 0 && run.level >= extraHighMin ? '!!' : '-'}</td>
             </tr>
           `;
         });

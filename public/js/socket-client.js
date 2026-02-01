@@ -105,6 +105,11 @@ class TournamentClient {
       this.emit('tournament:status', data);
     });
 
+    // Runtime config update
+    this.socket.on('config:update', (config) => {
+      this.emit('config:update', config);
+    });
+
     // Admin response
     this.socket.on('admin:response', (response) => {
       this.emit('admin:response', response);
@@ -166,6 +171,18 @@ class TournamentClient {
 
   clearActiveRun(teamName) {
     this.socket.emit('admin:clearActiveRun', { teamName });
+  }
+
+  updateConfig(changes) {
+    this.socket.emit('admin:updateConfig', changes);
+  }
+
+  getConfig() {
+    this.socket.emit('admin:getConfig');
+  }
+
+  reloadScoring() {
+    this.socket.emit('admin:reloadScoring');
   }
 
   // Getters

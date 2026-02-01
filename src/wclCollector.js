@@ -6,6 +6,7 @@ const {
   makeAbsMs,
 } = require('./wclApi');
 const { calcUpgradesFromPar, pointsFor, DUNGEON_PAR_MS, slugifyDungeon } = require('./wclScoring');
+const logger = require('./logger');
 const {
   getTeams,
   getSeenWcl,
@@ -67,6 +68,7 @@ async function collectRunsAndSync() {
   const publicMsgs = [];
   const privateMsgs = [];
   const completedRuns = []; // Track completed runs to clear active status
+  let lastRateLimitData = null; // Capture WCL rate limit info
   const window = parseEventWindow();
 
   const teams = getTeams();
@@ -80,7 +82,7 @@ async function collectRunsAndSync() {
     const teamName = team.team_name || 'Unknown';
     const codes = collectCodes(team);
     if (!codes.length) {
-      privateMsgs.push(`[WCL Info] team=${teamName} has no report codes`);
+      logger.debug('WCL', `team=${teamName} has no report codes`);
       continue;
     }
 
@@ -91,36 +93,35 @@ async function collectRunsAndSync() {
         const res = await wclFetchReportMplusFights(code);
         report = res.report;
         fights = res.fights;
+        if (res.rateLimitData) {
+          lastRateLimitData = res.rateLimitData;
+        }
       } catch (err) {
         privateMsgs.push(`[WCL] ${teamName}: failed ${code}: ${err.message || err}`);
         continue;
       }
 
-      privateMsgs.push(`[WCL Info] team=${teamName} code=${code} fights=${fights.length}`);
+      logger.debug('WCL', `team=${teamName} code=${code} fights=${fights.length}`);
       const repStart = Number(report.startTime || 0);
 
       for (const fight of fights) {
         const lvl = Number(fight.keystoneLevel || 0);
         if (!lvl) continue;
         if (WCL_REQUIRE_KILL && !fight.kill) {
-          privateMsgs.push(
-            `[WCL Info] cancelled run from team=${teamName} name=${fight.name} lvl=${lvl} id=${fight.id}`
-          );
+          logger.debug('WCL', `cancelled run from team=${teamName} name=${fight.name} lvl=${lvl} id=${fight.id}`);
           continue;
         }
 
         const stAbs = makeAbsMs(repStart, fight.startTime || 0);
         const enAbs = makeAbsMs(repStart, fight.endTime || 0);
         if (enAbs <= stAbs) {
-          privateMsgs.push(`[WCL Info] skip bad times id=${fight.id} st=${stAbs} en=${enAbs}`);
+          logger.debug('WCL', `skip bad times id=${fight.id} st=${stAbs} en=${enAbs}`);
           continue;
         }
 
         if (EVENT_ENFORCE_WINDOW && window.start && window.end) {
           if (stAbs < window.start.getTime() || stAbs > window.end.getTime()) {
-            privateMsgs.push(
-              `[WCL Info] ${teamName} started run outside of event window id=${fight.id}`
-            );
+            logger.debug('WCL', `${teamName} started run outside of event window id=${fight.id}`);
             continue;
           }
         }
@@ -131,26 +132,21 @@ async function collectRunsAndSync() {
         const endMinute = Math.floor(enAbs / 60000);
         const dedupe = `team:${teamName}:${fight.name}:${lvl}:${endMinute}`;
         if (seen.has(dedupe) || newSeen.has(dedupe)) {
-          privateMsgs.push(`[WCL Info] skip duplicate run: ${fight.name} +${lvl} (team=${teamName})`);
+          logger.debug('WCL', `skip duplicate run: ${fight.name} +${lvl} (team=${teamName})`);
           continue;
         }
 
-        let deaths = 0;
-        try {
-          deaths = await wclCountDeathsForFight(code, fight.id);
-        } catch (err) {
-          console.warn(`[WCL] Failed to fetch death count for ${teamName} fight=${fight.id}: ${err.message || err}`);
-          deaths = 0;
-        }
-
-        // Fetch boss kill times
-        let bossKills = [];
-        try {
-          bossKills = await wclFetchBossKillTimes(code, fight.id, fight.startTime || 0);
-        } catch (err) {
-          console.warn(`[WCL] Failed to fetch boss kills for ${teamName} fight=${fight.id}: ${err.message || err}`);
-          bossKills = [];
-        }
+        // Fetch deaths and boss kills in parallel
+        const [deaths, bossKills] = await Promise.all([
+          wclCountDeathsForFight(code, fight.id).catch(err => {
+            console.warn(`[WCL] Failed to fetch death count for ${teamName} fight=${fight.id}: ${err.message || err}`);
+            return 0;
+          }),
+          wclFetchBossKillTimes(code, fight.id, fight.startTime || 0).catch(err => {
+            console.warn(`[WCL] Failed to fetch boss kills for ${teamName} fight=${fight.id}: ${err.message || err}`);
+            return [];
+          }),
+        ]);
 
         let adjustedClearMs;
         const keystoneTime = Number(fight.keystoneTime || 0);
@@ -164,9 +160,9 @@ async function collectRunsAndSync() {
 
         let upgrades = 0;
         let inTime = false;
-        if (Number.isFinite(fight.keystoneBonus)) {
+        if (Number.isFinite(fight.keystoneBonus) && fight.keystoneBonus > 0) {
           upgrades = Number(fight.keystoneBonus);
-          inTime = upgrades > 0;
+          inTime = true;
         } else {
           const par = calcUpgradesFromPar(fight.name, adjustedClearMs);
           upgrades = par.upgrades;
@@ -200,6 +196,7 @@ async function collectRunsAndSync() {
           deaths: Number(deaths || 0),
           duration_ms: adjustedClearMs,
           boss_kills: JSON.stringify(bossKills),
+          potions_used: 0,
           character: '',
           realm: '',
           region: '',
@@ -221,6 +218,7 @@ async function collectRunsAndSync() {
           inTime,
           upgrades,
           deaths,
+          potionsUsed: 0,
           points,
           blizzRating: blizzRating,
           completedAt: dtEnd.toISOString(),
@@ -229,7 +227,9 @@ async function collectRunsAndSync() {
         privateMsgs.push(
           `${teamLabel} completed ${fight.name} +${lvl}, ${upgLabel}, timer: ${timerStr}, points: ${points}`
         );
-        publicMsgs.push(`A team completed ${fight.name} +${lvl}`);
+        if (inTime) {
+          publicMsgs.push(`A team completed ${fight.name} +${lvl}`);
+        }
       }
     }
   }
@@ -239,7 +239,7 @@ async function collectRunsAndSync() {
     saveSeenWcl(merged);
   }
 
-  return { publicMsgs, privateMsgs, newCount: added, completedRuns };
+  return { publicMsgs, privateMsgs, newCount: added, completedRuns, rateLimitData: lastRateLimitData };
 }
 
 module.exports = { collectRunsAndSync };

@@ -8,6 +8,7 @@ const { updateTeam, upsertTeam, findTeam, renameTeamInLeaderboard, saveTeams, ge
 const { wclExtractCode } = require('./wclApi');
 const { DUNGEON_PAR_MS, DUNGEON_SHORT_NAMES } = require('./wclScoring');
 const { CORS_ORIGINS, ADMIN_SECRET, OBS_WS_PORT } = require('./config');
+const runtimeConfig = require('./runtimeConfig');
 
 let io = null;
 let server = null;
@@ -102,7 +103,8 @@ function createWebServer(config = {}) {
 
   app.get('/api/best-times', (req, res) => {
     const dungeon = req.query.dungeon || null;
-    res.json(getBestRunsPerDungeon(dungeon));
+    const includeAll = req.query.includeAll === '1';
+    res.json(getBestRunsPerDungeon(dungeon, includeAll));
   });
 
   app.get('/api/dungeon-pars', (req, res) => {
@@ -120,6 +122,7 @@ function createWebServer(config = {}) {
     for (const run of scores) {
       if (!run.team) continue;
       if (teamFilter && run.team !== teamFilter) continue;
+      if (!run.in_time && !run.points) continue;
       if (!teams[run.team]) teams[run.team] = [];
       teams[run.team].push(run);
     }
@@ -148,7 +151,7 @@ function createWebServer(config = {}) {
         };
       }
 
-      if (run.level > stats[team].highestKey) {
+      if (run.in_time && run.level > stats[team].highestKey) {
         stats[team].highestKey = run.level;
       }
       stats[team].totalDeaths += run.deaths || 0;
@@ -168,6 +171,11 @@ function createWebServer(config = {}) {
     }
 
     res.json(result);
+  });
+
+  // Runtime config API
+  app.get('/api/runtime-config', (req, res) => {
+    res.json(runtimeConfig.getAll());
   });
 
   // Health check
@@ -376,6 +384,60 @@ function createWebServer(config = {}) {
         success: true,
         message: hadRun ? `${teamName} run cleared` : `${teamName} was not running`
       });
+    });
+
+    // Admin: Update runtime config
+    socket.on('admin:updateConfig', (data) => {
+      if (!requireAdmin()) return;
+      if (!data || typeof data !== 'object') {
+        socket.emit('admin:response', { success: false, message: 'Invalid config data' });
+        return;
+      }
+
+      const changes = {};
+      if (data.eventStartSE !== undefined) changes.eventStartSE = String(data.eventStartSE || '');
+      if (data.eventEndSE !== undefined) changes.eventEndSE = String(data.eventEndSE || '');
+      if (data.pollIntervalActiveMs !== undefined) {
+        const val = Number(data.pollIntervalActiveMs);
+        if (Number.isFinite(val) && val >= 10000 && val <= 300000) {
+          changes.pollIntervalActiveMs = val;
+        }
+      }
+      if (data.pollIntervalIdleMs !== undefined) {
+        const val = Number(data.pollIntervalIdleMs);
+        if (Number.isFinite(val) && val >= 60000 && val <= 600000) {
+          changes.pollIntervalIdleMs = val;
+        }
+      }
+      if (data.requireKill !== undefined) {
+        changes.requireKill = Boolean(data.requireKill);
+      }
+
+      if (Object.keys(changes).length === 0) {
+        socket.emit('admin:response', { success: false, message: 'No valid config changes' });
+        return;
+      }
+
+      runtimeConfig.update(changes);
+      io.emit('config:update', runtimeConfig.getAll());
+      socket.emit('admin:response', { success: true, message: 'Config saved to disk' });
+    });
+
+    // Admin: Get runtime config
+    socket.on('admin:getConfig', () => {
+      socket.emit('config:update', runtimeConfig.getAll());
+    });
+
+    // Admin: Reload scoring tables
+    socket.on('admin:reloadScoring', () => {
+      if (!requireAdmin()) return;
+      try {
+        const { reloadScoring } = require('./wclScoring');
+        reloadScoring();
+        socket.emit('admin:response', { success: true, message: 'Scoring tables reloaded' });
+      } catch (err) {
+        socket.emit('admin:response', { success: false, message: `Failed to reload scoring: ${err.message}` });
+      }
     });
 
     socket.on('disconnect', () => {

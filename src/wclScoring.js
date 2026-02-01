@@ -1,96 +1,114 @@
-const DUNGEON_PAR_MS = {
-  'eco-dome-aldani': 1860000, // 31:00
-  'ara-kara-city-of-echoes': 1800000, // 30:00
-  'the-dawnbreaker': 1860000, // 31:00
-  'priory-of-the-sacred-flame': 1950000, // 32:30
-  'operation-floodgate': 1980000, // 33:00
-  'halls-of-atonement': 1920000, // 32:00
-  'tazavesh-streets-of-wonder': 2100000, // 35:00
-  'tazavesh-soleahs-gambit': 1800000, // 30:00
-};
+const fs = require('fs');
+const path = require('path');
 
-const DUNGEON_SHORT_NAMES = {
-  'eco-dome-aldani': 'EDA',
-  'ara-kara-city-of-echoes': 'ARA',
-  'the-dawnbreaker': 'DAWN',
-  'priory-of-the-sacred-flame': 'PSF',
-  'operation-floodgate': 'FLOOD',
-  'halls-of-atonement': 'HOA',
-  'tazavesh-streets-of-wonder': 'STRT',
-  'tazavesh-soleahs-gambit': 'GMBT',
-};
+const SCORING_FILE = path.join(__dirname, '..', 'data', 'scoring.json');
 
-// Bracket-based scoring tables
-// Keys are key levels, values are { 1: points, 2: points, 3: points } for +1/+2/+3 upgrades
-const BRACKET_A = {
-   14: { 1: 1, 2: 2, 3: 3 },
-   15: { 1: 3, 2: 4, 3: 5 },
-   16: { 1: 5, 2: 6, 3: 7 },
-   17: { 1: 7, 2: 8, 3: 9 },
-   18: { 1: 9, 2: 10, 3: 11 },
-   19: { 1: 11, 2: 12, 3: 13 },
-   20: { 1: 13, 2: 14, 3: 15 },
-   21: { 1: 15, 2: 16, 3: 17 },
-   22: { 1: 0, 2: 0, 3: 0 },
-   23: { 1: 0, 2: 0, 3: 0 },
-   24: { 1: 0, 2: 0, 3: 0 },
-   25: { 1: 0, 2: 0, 3: 0 },
-};
+// Mutable state loaded from config file
+let DUNGEON_PAR_MS = {};
+let DUNGEON_SHORT_NAMES = {};
+let BRACKETS = {};
+let EPS_MS = 10100;
+let UPGRADE_RATIOS = { threeUpgrade: 0.6, twoUpgrade: 0.8 };
 
+function loadScoring() {
+  try {
+    const raw = fs.readFileSync(SCORING_FILE, 'utf8');
+    const data = JSON.parse(raw);
 
-const BRACKET_B = {
-  14: { 1: 0, 2: 0, 3: 1 },
-  15: { 1: 1, 2: 2, 3: 3 },
-  16: { 1: 3, 2: 4, 3: 5 },
-  17: { 1: 5, 2: 6, 3: 7 },
-  18: { 1: 7, 2: 8, 3: 9 },
-  19: { 1: 9, 2: 10, 3: 11 },
-  20: { 1: 11, 2: 12, 3: 13 },
-  21: { 1: 13, 2: 14, 3: 15 },
-  22: { 1: 15, 2: 16, 3: 17 },
-  23: { 1: 0, 2: 0, 3: 0 },
-  24: { 1: 0, 2: 0, 3: 0 },
-  25: { 1: 0, 2: 0, 3: 0 },
-};
+    if (data.dungeonParMs) DUNGEON_PAR_MS = data.dungeonParMs;
+    if (data.dungeonShortNames) DUNGEON_SHORT_NAMES = data.dungeonShortNames;
+    if (data.epsMs !== undefined) EPS_MS = Number(data.epsMs);
+    if (data.upgradeRatios) UPGRADE_RATIOS = data.upgradeRatios;
 
-const BRACKET_C = {
-  14: { 1: 0, 2: 0, 3: 1 },
-  15: { 1: 0, 2: 0, 3: 1 },
-  16: { 1: 1, 2: 2, 3: 3 },
-  17: { 1: 3, 2: 4, 3: 5 },
-  18: { 1: 5, 2: 6, 3: 7 },
-  19: { 1: 7, 2: 8, 3: 9 },
-  20: { 1: 9, 2: 10, 3: 11 },
-  21: { 1: 11, 2: 12, 3: 13 },
-  22: { 1: 13, 2: 14, 3: 15 },
-  23: { 1: 15, 2: 16, 3: 17 },
-  24: { 1: 0, 2: 0, 3: 0 },
-  25: { 1: 0, 2: 0, 3: 0 },
-};
+    if (data.brackets) {
+      // Convert string keys to numbers for bracket tables
+      BRACKETS = {};
+      for (const [bracketKey, levels] of Object.entries(data.brackets)) {
+        BRACKETS[bracketKey] = {};
+        for (const [lvl, upgrades] of Object.entries(levels)) {
+          BRACKETS[bracketKey][Number(lvl)] = {};
+          for (const [upg, pts] of Object.entries(upgrades)) {
+            BRACKETS[bracketKey][Number(lvl)][Number(upg)] = Number(pts);
+          }
+        }
+      }
+    }
 
-const BRACKET_D = {
-  14: { 1: 0, 2: 0, 3: 1 },
-  15: { 1: 0, 2: 0, 3: 1 },
-  16: { 1: 0, 2: 0, 3: 1 },
-  17: { 1: 1, 2: 2, 3: 3 },
-  18: { 1: 3, 2: 4, 3: 5 },
-  19: { 1: 5, 2: 6, 3: 7 },
-  20: { 1: 7, 2: 8, 3: 9 },
-  21: { 1: 9, 2: 10, 3: 11 },
-  22: { 1: 11, 2: 12, 3: 13 },
-  23: { 1: 13, 2: 14, 3: 15 },
-  24: { 1: 15, 2: 16, 3: 17 },
-  25: { 1: 0, 2: 0, 3: 0 },
-};
+    console.log(`[Scoring] Loaded scoring config from ${SCORING_FILE}`);
+  } catch (err) {
+    console.warn(`[Scoring] Failed to load ${SCORING_FILE}, using defaults: ${err.message}`);
+    loadDefaults();
+  }
+}
 
-const BRACKETS = {
-  A: BRACKET_A,
-  B: BRACKET_B,
-  C: BRACKET_C,
-  D: BRACKET_D,
-};
+function loadDefaults() {
+  DUNGEON_PAR_MS = {
+    'eco-dome-aldani': 1860000,
+    'ara-kara-city-of-echoes': 1800000,
+    'the-dawnbreaker': 1860000,
+    'priory-of-the-sacred-flame': 1950000,
+    'operation-floodgate': 1980000,
+    'halls-of-atonement': 1920000,
+    'tazavesh-streets-of-wonder': 2100000,
+    'tazavesh-soleahs-gambit': 1800000,
+  };
 
-const EPS_MS = 500;
+  DUNGEON_SHORT_NAMES = {
+    'eco-dome-aldani': 'EDA',
+    'ara-kara-city-of-echoes': 'ARA',
+    'the-dawnbreaker': 'DAWN',
+    'priory-of-the-sacred-flame': 'PSF',
+    'operation-floodgate': 'FLOOD',
+    'halls-of-atonement': 'HOA',
+    'tazavesh-streets-of-wonder': 'STRT',
+    'tazavesh-soleahs-gambit': 'GMBT',
+  };
+
+  BRACKETS = {
+    A: {
+      14: { 1: 1, 2: 2, 3: 3 }, 15: { 1: 3, 2: 4, 3: 5 },
+      16: { 1: 5, 2: 6, 3: 7 }, 17: { 1: 7, 2: 8, 3: 9 },
+      18: { 1: 9, 2: 10, 3: 11 }, 19: { 1: 11, 2: 12, 3: 13 },
+      20: { 1: 13, 2: 14, 3: 15 }, 21: { 1: 15, 2: 16, 3: 17 },
+      22: { 1: 0, 2: 0, 3: 0 }, 23: { 1: 0, 2: 0, 3: 0 },
+      24: { 1: 0, 2: 0, 3: 0 }, 25: { 1: 0, 2: 0, 3: 0 },
+    },
+    B: {
+      14: { 1: 0, 2: 0, 3: 1 }, 15: { 1: 1, 2: 2, 3: 3 },
+      16: { 1: 3, 2: 4, 3: 5 }, 17: { 1: 5, 2: 6, 3: 7 },
+      18: { 1: 7, 2: 8, 3: 9 }, 19: { 1: 9, 2: 10, 3: 11 },
+      20: { 1: 11, 2: 12, 3: 13 }, 21: { 1: 13, 2: 14, 3: 15 },
+      22: { 1: 15, 2: 16, 3: 17 }, 23: { 1: 0, 2: 0, 3: 0 },
+      24: { 1: 0, 2: 0, 3: 0 }, 25: { 1: 0, 2: 0, 3: 0 },
+    },
+    C: {
+      14: { 1: 0, 2: 0, 3: 1 }, 15: { 1: 0, 2: 0, 3: 1 },
+      16: { 1: 1, 2: 2, 3: 3 }, 17: { 1: 3, 2: 4, 3: 5 },
+      18: { 1: 5, 2: 6, 3: 7 }, 19: { 1: 7, 2: 8, 3: 9 },
+      20: { 1: 9, 2: 10, 3: 11 }, 21: { 1: 11, 2: 12, 3: 13 },
+      22: { 1: 13, 2: 14, 3: 15 }, 23: { 1: 15, 2: 16, 3: 17 },
+      24: { 1: 0, 2: 0, 3: 0 }, 25: { 1: 0, 2: 0, 3: 0 },
+    },
+    D: {
+      14: { 1: 0, 2: 0, 3: 1 }, 15: { 1: 0, 2: 0, 3: 1 },
+      16: { 1: 0, 2: 0, 3: 1 }, 17: { 1: 1, 2: 2, 3: 3 },
+      18: { 1: 3, 2: 4, 3: 5 }, 19: { 1: 5, 2: 6, 3: 7 },
+      20: { 1: 7, 2: 8, 3: 9 }, 21: { 1: 9, 2: 10, 3: 11 },
+      22: { 1: 11, 2: 12, 3: 13 }, 23: { 1: 13, 2: 14, 3: 15 },
+      24: { 1: 15, 2: 16, 3: 17 }, 25: { 1: 0, 2: 0, 3: 0 },
+    },
+  };
+
+  EPS_MS = 10100;
+  UPGRADE_RATIOS = { threeUpgrade: 0.6, twoUpgrade: 0.8 };
+}
+
+// Load on module initialization
+loadScoring();
+
+function reloadScoring() {
+  loadScoring();
+}
 
 function slugifyDungeon(name) {
   return String(name || '')
@@ -115,8 +133,8 @@ function calcUpgradesFromPar(dungeonName, clearMs) {
   }
 
   const ratio = clearMs / par;
-  if (ratio <= 0.6) return { inTime: true, upgrades: 3 };
-  if (ratio <= 0.8) return { inTime: true, upgrades: 2 };
+  if (ratio <= UPGRADE_RATIOS.threeUpgrade) return { inTime: true, upgrades: 3 };
+  if (ratio <= UPGRADE_RATIOS.twoUpgrade) return { inTime: true, upgrades: 2 };
   return { inTime: true, upgrades: 1 };
 }
 
@@ -131,7 +149,8 @@ function calcUpgradesFromPar(dungeonName, clearMs) {
 function pointsFor(level, upgrades, inTime, bracket = 'A') {
   if (!inTime) return 0;
 
-  const bracketTable = BRACKETS[String(bracket).toUpperCase()] || BRACKET_A;
+  const bracketTable = BRACKETS[String(bracket).toUpperCase()] || BRACKETS.A;
+  if (!bracketTable) return 0;
   const levelPoints = bracketTable[Number(level)];
 
   if (!levelPoints) return 0;
@@ -162,7 +181,8 @@ module.exports = {
   getValidBrackets,
   getShortDungeonName,
   slugifyDungeon,
-  BRACKETS,
-  DUNGEON_PAR_MS,
-  DUNGEON_SHORT_NAMES,
+  reloadScoring,
+  get BRACKETS() { return BRACKETS; },
+  get DUNGEON_PAR_MS() { return DUNGEON_PAR_MS; },
+  get DUNGEON_SHORT_NAMES() { return DUNGEON_SHORT_NAMES; },
 };

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-04-17
+
+### New Files
+- `src/directorState.js` — Singleton EventEmitter holding broadcast/presentation state (active layout, slot assignments, audio mute, alt-card config). Persists to `data/director-state.json` via `DIRECTOR_STATE_PATH` env override.
+- `tests/directorState.test.js` — 6 unit tests covering defaults, persistence, event emission, slot updates, and validation.
+
+### Configuration
+- `.gitignore` — Added `data/director-state.json` and `tests/.tmp-*` to prevent runtime/test artifacts from being committed.
+
 ## 2026-02-01
 
 ### Bug Fixes

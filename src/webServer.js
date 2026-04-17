@@ -9,6 +9,7 @@ const { wclExtractCode } = require('./wclApi');
 const { DUNGEON_PAR_MS, DUNGEON_SHORT_NAMES } = require('./wclScoring');
 const { CORS_ORIGINS, ADMIN_SECRET, OBS_WS_PORT } = require('./config');
 const runtimeConfig = require('./runtimeConfig');
+const directorState = require('./directorState');
 
 let io = null;
 let server = null;
@@ -66,6 +67,11 @@ function createWebServer(config = {}) {
       origin: corsOrigin,
       methods: ['GET', 'POST'],
     },
+  });
+
+  // Broadcast directorState changes to all connected clients
+  directorState.on('change', (s) => {
+    io.emit('director:state', s);
   });
 
   // Serve static files from public directory
@@ -178,6 +184,34 @@ function createWebServer(config = {}) {
     res.json(runtimeConfig.getAll());
   });
 
+  // TEMPORARY Phase 1 test endpoint. Replaced in Phase 2 by authenticated
+  // Socket.io director:* events from the caster panel.
+  app.get('/api/director', (req, res) => {
+    res.json(directorState.getState());
+  });
+
+  app.post('/api/director', express.json(), (req, res) => {
+    const { layout, slot, team, pinnedSlide, mainAudioUnmuted } = req.body || {};
+    try {
+      if (layout !== undefined) directorState.setLayout(layout);
+      if (slot !== undefined) directorState.setSlot(slot, team ?? null);
+      if (pinnedSlide !== undefined) directorState.setPinnedSlide(pinnedSlide);
+      if (mainAudioUnmuted !== undefined) directorState.setMainAudio(mainAudioUnmuted);
+      // Also pass through tournamentContext directly (used by brand strip later)
+      if (req.body.tournamentContext !== undefined) {
+        directorState.state.tournamentContext = {
+          ...directorState.state.tournamentContext,
+          ...req.body.tournamentContext,
+        };
+        directorState._save();
+        directorState.emit('change', directorState.getState());
+      }
+      res.json({ ok: true, state: directorState.getState() });
+    } catch (err) {
+      res.status(400).json({ ok: false, error: err.message });
+    }
+  });
+
   // Health check
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', time: Date.now() });
@@ -200,6 +234,7 @@ function createWebServer(config = {}) {
 
     // Send full state on connect
     socket.emit('state:sync', stateManager.getFullState());
+    socket.emit('director:state', directorState.getState());
 
     // Admin: Update team report code (legacy)
     socket.on('admin:setReportCode', async (data) => {

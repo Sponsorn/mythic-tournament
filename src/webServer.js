@@ -397,6 +397,8 @@ function createWebServer(config = {}) {
       const changes = {};
       if (data.eventStartSE !== undefined) changes.eventStartSE = String(data.eventStartSE || '');
       if (data.eventEndSE !== undefined) changes.eventEndSE = String(data.eventEndSE || '');
+      if (data.breakStartSE !== undefined) changes.breakStartSE = String(data.breakStartSE || '');
+      if (data.breakEndSE !== undefined) changes.breakEndSE = String(data.breakEndSE || '');
       if (data.pollIntervalActiveMs !== undefined) {
         const val = Number(data.pollIntervalActiveMs);
         if (Number.isFinite(val) && val >= 10000 && val <= 300000) {

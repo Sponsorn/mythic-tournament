@@ -43,14 +43,14 @@ function loadScoring() {
 
 function loadDefaults() {
   DUNGEON_PAR_MS = {
-    'eco-dome-aldani': 1860000,
-    'ara-kara-city-of-echoes': 1800000,
-    'the-dawnbreaker': 1860000,
-    'priory-of-the-sacred-flame': 1950000,
-    'operation-floodgate': 1980000,
-    'halls-of-atonement': 1920000,
-    'tazavesh-streets-of-wonder': 2100000,
-    'tazavesh-soleahs-gambit': 1800000,
+    'eco-dome-aldani': 1860000,           // 31:00
+    'ara-kara-city-of-echoes': 1800000,   // 30:00
+    'the-dawnbreaker': 1860000,           // 31:00
+    'priory-of-the-sacred-flame': 1950000, // 32:30
+    'operation-floodgate': 1980000,       // 33:00
+    'halls-of-atonement': 1920000,        // 32:00
+    'tazavesh-streets-of-wonder': 2100000, // 35:00
+    'tazavesh-soleahs-gambit': 1800000,   // 30:00
   };
 
   DUNGEON_SHORT_NAMES = {

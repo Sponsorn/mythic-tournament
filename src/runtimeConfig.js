@@ -6,6 +6,8 @@ const CONFIG_FILE = path.join(__dirname, '..', 'data', 'runtime-config.json');
 const DEFAULTS = {
   eventStartSE: '',
   eventEndSE: '',
+  breakStartSE: '',
+  breakEndSE: '',
   pollIntervalActiveMs: 60000,
   pollIntervalIdleMs: 300000,
   requireKill: true,

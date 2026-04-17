@@ -213,15 +213,11 @@
   </div>
 
   <script>
-    // Tournament schedule (CET/local time)
-    const TOURNAMENT_START = new Date('2026-01-31T18:00:00');
-    const BREAK_START = new Date('2026-01-31T19:30:00');
-    const BREAK_END = new Date('2026-01-31T20:00:00');
-    const TOURNAMENT_END = new Date('2026-01-31T21:30:00');
-
-    // Total duration for progress calculation (excluding break)
-    const TOTAL_DURATION_MS = TOURNAMENT_END - TOURNAMENT_START;
-    const BREAK_DURATION_MS = BREAK_END - BREAK_START;
+    // Schedule loaded from runtime config API
+    let TOURNAMENT_START = null;
+    let TOURNAMENT_END = null;
+    let BREAK_START = null;
+    let BREAK_END = null;
 
     // Elements
     const progressLabel = document.getElementById('progressLabel');
@@ -230,7 +226,7 @@
     const breakMarker = document.getElementById('breakMarker');
     const breakZone = document.getElementById('breakZone');
 
-    function formatHoursMinutes(ms) {
+    function formatCountdown(ms) {
       const totalSeconds = Math.floor(ms / 1000);
       const hours = Math.floor(totalSeconds / 3600);
       const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -238,29 +234,55 @@
       if (hours > 0) {
         return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
       }
-      if (minutes >= 5) {
+      if (minutes >= 10) {
         return `${minutes}m`;
       }
       return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }
 
+    function loadSchedule() {
+      fetch('/api/runtime-config')
+        .then(res => res.json())
+        .then(cfg => {
+          if (cfg.eventStartSE) TOURNAMENT_START = new Date(cfg.eventStartSE);
+          if (cfg.eventEndSE) TOURNAMENT_END = new Date(cfg.eventEndSE);
+          if (cfg.breakStartSE) BREAK_START = new Date(cfg.breakStartSE);
+          if (cfg.breakEndSE) BREAK_END = new Date(cfg.breakEndSE);
+        })
+        .catch(err => console.warn('Failed to load schedule:', err));
+    }
+
+    function hasBreak() {
+      return BREAK_START && BREAK_END && BREAK_START < BREAK_END;
+    }
+
     function updateProgress() {
       const now = new Date();
+
+      if (!TOURNAMENT_START || !TOURNAMENT_END) {
+        progressLabel.textContent = 'Schedule Not Set';
+        progressTime.textContent = '--:--';
+        progressTime.className = 'progress-time';
+        progressFill.style.width = '0%';
+        breakMarker.style.display = 'none';
+        breakZone.style.display = 'none';
+        return;
+      }
+
+      const totalDurationMs = TOURNAMENT_END - TOURNAMENT_START;
 
       // Before tournament starts - countdown mode
       if (now < TOURNAMENT_START) {
         const remaining = TOURNAMENT_START - now;
         progressLabel.textContent = 'Tournament Starts In';
-        progressTime.textContent = formatHoursMinutes(remaining);
+        progressTime.textContent = formatCountdown(remaining);
         progressTime.className = 'progress-time countdown';
         progressFill.className = 'progress-bar-fill countdown';
 
-        // Show countdown progress (last 6 hours)
         const sixHours = 6 * 60 * 60 * 1000;
         const countdownProgress = Math.max(0, (sixHours - remaining) / sixHours * 100);
         progressFill.style.width = `${countdownProgress}%`;
 
-        // Hide break markers during countdown
         breakMarker.style.display = 'none';
         breakZone.style.display = 'none';
         return;
@@ -281,40 +303,47 @@
 
       // During tournament - show progress to end
       const elapsed = now - TOURNAMENT_START;
-      const progress = (elapsed / TOTAL_DURATION_MS) * 100;
+      const progress = (elapsed / totalDurationMs) * 100;
       progressFill.className = 'progress-bar-fill';
       progressFill.style.width = `${Math.min(100, progress)}%`;
 
-      // Calculate break marker position (as % of total duration)
-      const breakStartPercent = ((BREAK_START - TOURNAMENT_START) / TOTAL_DURATION_MS) * 100;
-      const breakEndPercent = ((BREAK_END - TOURNAMENT_START) / TOTAL_DURATION_MS) * 100;
+      // Break markers
+      if (hasBreak()) {
+        const breakStartPercent = ((BREAK_START - TOURNAMENT_START) / totalDurationMs) * 100;
+        const breakEndPercent = ((BREAK_END - TOURNAMENT_START) / totalDurationMs) * 100;
 
-      breakMarker.style.display = 'block';
-      breakMarker.style.left = `${breakStartPercent}%`;
+        breakMarker.style.display = 'block';
+        breakMarker.style.left = `${breakStartPercent}%`;
+        breakZone.style.display = 'block';
+        breakZone.style.left = `${breakStartPercent}%`;
+        breakZone.style.width = `${breakEndPercent - breakStartPercent}%`;
 
-      breakZone.style.display = 'block';
-      breakZone.style.left = `${breakStartPercent}%`;
-      breakZone.style.width = `${breakEndPercent - breakStartPercent}%`;
-
-      // During break
-      if (now >= BREAK_START && now < BREAK_END) {
-        const breakRemaining = BREAK_END - now;
-        progressLabel.textContent = 'Break - Resumes In';
-        progressTime.textContent = formatHoursMinutes(breakRemaining);
-        progressTime.className = 'progress-time break';
-        return;
+        // During break
+        if (now >= BREAK_START && now < BREAK_END) {
+          const breakRemaining = BREAK_END - now;
+          progressLabel.textContent = 'Break - Resumes In';
+          progressTime.textContent = formatCountdown(breakRemaining);
+          progressTime.className = 'progress-time break';
+          return;
+        }
+      } else {
+        breakMarker.style.display = 'none';
+        breakZone.style.display = 'none';
       }
 
       // Normal tournament time - show remaining
       const remaining = TOURNAMENT_END - now;
       progressLabel.textContent = 'Last Run Must Start By';
-      progressTime.textContent = formatHoursMinutes(remaining);
+      progressTime.textContent = formatCountdown(remaining);
       progressTime.className = 'progress-time';
     }
 
-    // Update every second
+    // Load schedule then start ticking
+    loadSchedule();
     updateProgress();
     setInterval(updateProgress, 1000);
+    // Re-fetch schedule periodically in case admin changes it
+    setInterval(loadSchedule, 30000);
   </script>
 </body>
 </html>

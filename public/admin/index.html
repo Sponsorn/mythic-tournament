@@ -72,6 +72,14 @@
           <input type="text" class="input" id="cfgEventEnd" placeholder="YYYY-MM-DD HH:mm">
         </div>
         <div class="form-group" style="margin: 0;">
+          <label class="form-label">Break Start (local time, optional)</label>
+          <input type="text" class="input" id="cfgBreakStart" placeholder="YYYY-MM-DD HH:mm">
+        </div>
+        <div class="form-group" style="margin: 0;">
+          <label class="form-label">Break End (local time, optional)</label>
+          <input type="text" class="input" id="cfgBreakEnd" placeholder="YYYY-MM-DD HH:mm">
+        </div>
+        <div class="form-group" style="margin: 0;">
           <label class="form-label">Poll Interval Active (ms, 10000-300000)</label>
           <input type="number" class="input" id="cfgPollActive" min="10000" max="300000" step="1000">
         </div>
@@ -597,6 +605,8 @@
     // Settings panel
     const cfgEventStart = document.getElementById('cfgEventStart');
     const cfgEventEnd = document.getElementById('cfgEventEnd');
+    const cfgBreakStart = document.getElementById('cfgBreakStart');
+    const cfgBreakEnd = document.getElementById('cfgBreakEnd');
     const cfgPollActive = document.getElementById('cfgPollActive');
     const cfgPollIdle = document.getElementById('cfgPollIdle');
     const cfgRequireKill = document.getElementById('cfgRequireKill');
@@ -605,6 +615,8 @@
       if (!cfg) return;
       cfgEventStart.value = cfg.eventStartSE || '';
       cfgEventEnd.value = cfg.eventEndSE || '';
+      cfgBreakStart.value = cfg.breakStartSE || '';
+      cfgBreakEnd.value = cfg.breakEndSE || '';
       cfgPollActive.value = cfg.pollIntervalActiveMs || 60000;
       cfgPollIdle.value = cfg.pollIntervalIdleMs || 300000;
       cfgRequireKill.checked = cfg.requireKill !== false;
@@ -629,6 +641,8 @@
       client.updateConfig({
         eventStartSE: cfgEventStart.value.trim(),
         eventEndSE: cfgEventEnd.value.trim(),
+        breakStartSE: cfgBreakStart.value.trim(),
+        breakEndSE: cfgBreakEnd.value.trim(),
         pollIntervalActiveMs: parseInt(cfgPollActive.value) || 60000,
         pollIntervalIdleMs: parseInt(cfgPollIdle.value) || 300000,
         requireKill: cfgRequireKill.checked,

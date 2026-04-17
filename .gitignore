@@ -8,7 +8,10 @@ data/store.json
 data/wcl.json
 data/wcl_scores.csv
 data/runtime-config.json
+data/director-state.json
 data/*copy*
+
+tests/.tmp-*
 
 .superpowers/
 nul

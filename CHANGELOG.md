@@ -3,6 +3,9 @@
 ## 2026-04-17
 
 ### Improvements
+- **`twitchChannel` field added to team records** — `wclStorage.ensureTeamDefaults` now includes `twitch_channel: ''` so all new and reloaded teams carry the field. `updateTeam` accepts and persists the value. `stateManager.refreshTeams` maps it to `twitchChannel` in the frontend team shape. The `admin:updateTeam` socket handler in `webServer.js` accepts and forwards the field. The admin dashboard edit modal gains a "Twitch Channel" text input that populates on open and is included in the save payload via `socket-client.js`.
+
+### Improvements
 - **`stateManager.onRunComplete` emits delta fields** — The `run:complete` event payload now includes `pointsEarned`, `newTotal`, `newRank`, and `previousRank` computed from a pre-completion leaderboard snapshot. The existing `recap` object and all downstream emits (`activeRuns:update`, `scoreboard:update`) are preserved.
 
 ### Tests

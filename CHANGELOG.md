@@ -3,6 +3,12 @@
 ## 2026-04-17
 
 ### Improvements
+- **`stateManager.onRunComplete` emits delta fields** — The `run:complete` event payload now includes `pointsEarned`, `newTotal`, `newRank`, and `previousRank` computed from a pre-completion leaderboard snapshot. The existing `recap` object and all downstream emits (`activeRuns:update`, `scoreboard:update`) are preserved.
+
+### Tests
+- Added `tests/runCompletePayload.test.js` — Verifies the `run:complete` payload includes correct delta fields using a seeded leaderboard via the new `_testSetLeaderboard` test helper.
+
+### Improvements
 - **`webServer.js` wires `directorState` into Socket.io** — New clients receive `director:state` on connect; all state mutations broadcast `director:state` to every connected client. Adds temporary Phase 1 HTTP endpoints `GET /api/director` and `POST /api/director` for smoke-testing layout, slot, pinnedSlide, mainAudio, and tournamentContext fields.
 
 ### Bug Fixes

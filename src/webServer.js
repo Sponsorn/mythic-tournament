@@ -15,6 +15,7 @@ let io = null;
 let server = null;
 let forceRefreshCallback = null;
 let stateListeners = [];
+let directorChangeHandler = null;
 
 function validateRequired(data, fields) {
   if (!data || typeof data !== 'object') return 'Invalid request data';
@@ -70,9 +71,8 @@ function createWebServer(config = {}) {
   });
 
   // Broadcast directorState changes to all connected clients
-  directorState.on('change', (s) => {
-    io.emit('director:state', s);
-  });
+  directorChangeHandler = (s) => io.emit('director:state', s);
+  directorState.on('change', directorChangeHandler);
 
   // Serve static files from public directory
   const publicPath = path.join(__dirname, '..', 'public');
@@ -562,6 +562,12 @@ function stopServer() {
     stateManager.removeListener(event, handler);
   }
   stateListeners = [];
+
+  // Remove directorState listener to prevent leaks
+  if (directorChangeHandler) {
+    directorState.removeListener('change', directorChangeHandler);
+    directorChangeHandler = null;
+  }
 
   return new Promise((resolve) => {
     if (server) {

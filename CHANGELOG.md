@@ -2,6 +2,9 @@
 
 ## 2026-04-17
 
+### Improvements
+- **`webServer.js` wires `directorState` into Socket.io** — New clients receive `director:state` on connect; all state mutations broadcast `director:state` to every connected client. Adds temporary Phase 1 HTTP endpoints `GET /api/director` and `POST /api/director` for smoke-testing layout, slot, pinnedSlide, mainAudio, and tournamentContext fields.
+
 ### Bug Fixes
 - **`directorState._load` deep-merges nested objects** — Previously a shallow spread replaced entire nested objects (`slots`, `altCard`, `tournamentContext`) when loading persisted state, dropping any keys not present in the saved file. Now merges each nested object individually so new default keys survive across upgrades.
 - **`directorState.setSlot` bounds-checks array indices** — Out-of-range indices (e.g. `grid[99]`) now throw instead of silently extending the array with sparse holes. Scalar slots reject index notation; array slots require an index.

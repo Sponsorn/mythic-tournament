@@ -195,6 +195,11 @@ https://player.twitch.tv/?channel={twitchChannel}&parent={hostname}&muted=true&a
 - **Audio** — default `muted=true` on every embed to prevent cacophony. In layouts with a clear focused stream (A and D), the **main slot is unmutable**: the caster panel has an "unmute focused stream" toggle (default off). When toggled on, the compositor calls `player.setMuted(false)` on the main embed only — all other embeds remain muted regardless. Swapping focused team automatically mutes the outgoing team and unmutes the incoming one (if the toggle is on). In C/G/LB/BT the toggle is disabled (no single focused stream). Team voice-chat audio, commentary, dungeon sounds, etc. are what comes through when unmuted.
 - `parent={hostname}` — must match whatever domain the compositor is served from (localhost during dev, production host during broadcast).
 
+**Twitch Turbo / ad-free playback.** The compositor benefits from Twitch Turbo (host's paid account) if the browser session that renders the embeds is logged in:
+- **In OBS (host machine)**: the browser source uses CEF with a persistent cookie jar. One-time setup: right-click the browser source in OBS → **Interact** → navigate to `twitch.tv/login` inside the source → log in with the Turbo account → close Interact. Cookies persist across OBS restarts as long as **"Shutdown source when not visible"** and **"Refresh browser when scene becomes active"** are **unchecked** in the browser source properties. After login, all embeds in the compositor inherit the Turbo session and won't show ads.
+- **In caster panels (commentator machines)**: commentators are in regular browsers with their own Twitch sessions. No action needed — if they're logged into their own Twitch account (Turbo optional), the multiview thumbnails apply those session cookies automatically.
+- **Caveat**: Twitch's embed/iframe behavior around third-party cookies has gotten stricter over time. If we see ads despite login, fallback is to have the host's Chrome profile pointed at the compositor and use OBS **Window Capture** on that Chrome window instead of a browser source — Chrome's full cookie handling is more reliable. Document both options in the OBS setup guide.
+
 ## Caster control panel (`/caster`)
 
 Separate page, also served by the Node server, protected by `ADMIN_SECRET` query param or cookie.

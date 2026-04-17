@@ -39,7 +39,11 @@ class DirectorState extends EventEmitter {
     try {
       if (fs.existsSync(this.filePath)) {
         const raw = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
-        return { ...structuredClone(DEFAULTS), ...raw };
+        const merged = { ...structuredClone(DEFAULTS), ...raw };
+        merged.slots = { ...structuredClone(DEFAULTS.slots), ...(raw.slots || {}) };
+        merged.altCard = { ...structuredClone(DEFAULTS.altCard), ...(raw.altCard || {}) };
+        merged.tournamentContext = { ...structuredClone(DEFAULTS.tournamentContext), ...(raw.tournamentContext || {}) };
+        return merged;
       }
     } catch (err) {
       console.warn('[DirectorState] Failed to load, using defaults:', err.message);
@@ -49,6 +53,7 @@ class DirectorState extends EventEmitter {
 
   _save() {
     try {
+      fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
       fs.writeFileSync(this.filePath, JSON.stringify(this.state, null, 2), 'utf8');
     } catch (err) {
       console.warn('[DirectorState] Failed to save:', err.message);
@@ -75,9 +80,20 @@ class DirectorState extends EventEmitter {
     if (!(group in this.state.slots)) {
       throw new Error(`unknown slot group: ${group}`);
     }
+    const slot = this.state.slots[group];
     if (idx !== undefined) {
-      this.state.slots[group][Number(idx)] = team;
+      if (!Array.isArray(slot)) {
+        throw new Error(`slot group ${group} is not indexable`);
+      }
+      const i = Number(idx);
+      if (i < 0 || i >= slot.length) {
+        throw new Error(`slot index ${i} out of range for ${group} (length ${slot.length})`);
+      }
+      slot[i] = team;
     } else {
+      if (Array.isArray(slot)) {
+        throw new Error(`slot group ${group} requires an index`);
+      }
       this.state.slots[group] = team;
     }
     this._save();

@@ -60,3 +60,44 @@ test('directorState loads persisted state on require', () => {
   assert.equal(ds3.getState().activeLayout, 'LB');
   assert.equal(ds3.getState().slots.main, 'BRAVO');
 });
+
+test('directorState.setSlot rejects out-of-range grid index', () => {
+  const ds = freshState();
+  assert.throws(() => ds.setSlot('grid[99]', 'ALPHA'), /out of range/i);
+  assert.throws(() => ds.setSlot('grid[-1]', 'ALPHA'), /invalid slot key/i);
+});
+
+test('directorState.setSlot rejects indexing into a scalar slot', () => {
+  const ds = freshState();
+  assert.throws(() => ds.setSlot('main[0]', 'ALPHA'), /not indexable/i);
+});
+
+test('directorState.setSlot rejects missing index for array slot', () => {
+  const ds = freshState();
+  assert.throws(() => ds.setSlot('grid', 'ALPHA'), /requires an index/i);
+});
+
+test('directorState.setPinnedSlide accepts all valid values', () => {
+  const ds = freshState();
+  ds.setPinnedSlide('brand');
+  assert.equal(ds.getState().altCard.pinnedSlide, 'brand');
+  ds.setPinnedSlide(null);
+  assert.equal(ds.getState().altCard.pinnedSlide, null);
+  assert.throws(() => ds.setPinnedSlide('bogus'), /unknown pinned slide/i);
+});
+
+test('directorState._load deep-merges missing nested keys', () => {
+  // Write a minimal persisted state missing nested keys
+  fs.writeFileSync(TMP, JSON.stringify({ activeLayout: 'C', slots: { main: 'ALPHA' } }));
+  delete require.cache[require.resolve('../src/directorState')];
+  process.env.DIRECTOR_STATE_PATH = TMP;
+  const ds = require('../src/directorState');
+  const s = ds.getState();
+  assert.equal(s.activeLayout, 'C');
+  assert.equal(s.slots.main, 'ALPHA');
+  // Nested defaults preserved even though raw only had slots.main
+  assert.deepEqual(s.slots.grid, [null, null, null, null, null, null]);
+  assert.deepEqual(s.slots.quad, [null, null, null, null]);
+  assert.equal(s.altCard.rotationMs, 12000);
+  assert.equal(s.tournamentContext.title, 'M+ Tournament');
+});

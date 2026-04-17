@@ -2,9 +2,17 @@
 
 ## 2026-04-17
 
+### Bug Fixes
+- **`directorState._load` deep-merges nested objects** — Previously a shallow spread replaced entire nested objects (`slots`, `altCard`, `tournamentContext`) when loading persisted state, dropping any keys not present in the saved file. Now merges each nested object individually so new default keys survive across upgrades.
+- **`directorState.setSlot` bounds-checks array indices** — Out-of-range indices (e.g. `grid[99]`) now throw instead of silently extending the array with sparse holes. Scalar slots reject index notation; array slots require an index.
+- **`directorState._save` creates `data/` directory if missing** — On a fresh checkout the `data/` directory (gitignored) may not exist. `_save()` now calls `fs.mkdirSync(..., { recursive: true })` before writing, preventing silent persistence failures.
+
+### Tests
+- Added 5 new unit tests to `tests/directorState.test.js` covering the above fixes: out-of-range index, scalar indexing, missing array index, `setPinnedSlide` validation, and deep-merge on load. Total test count: 13.
+
 ### New Files
 - `src/directorState.js` — Singleton EventEmitter holding broadcast/presentation state (active layout, slot assignments, audio mute, alt-card config). Persists to `data/director-state.json` via `DIRECTOR_STATE_PATH` env override.
-- `tests/directorState.test.js` — 6 unit tests covering defaults, persistence, event emission, slot updates, and validation.
+- `tests/directorState.test.js` — Unit tests covering defaults, persistence, event emission, slot updates, and validation.
 
 ### Configuration
 - `.gitignore` — Added `data/director-state.json` and `tests/.tmp-*` to prevent runtime/test artifacts from being committed.

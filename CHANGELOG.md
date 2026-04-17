@@ -2,6 +2,24 @@
 
 ## 2026-04-17
 
+### New Files
+- `public/compositor/index.html` — HTML shell for the 1920x1080 compositor page. Loads all component/layout scripts and the Socket.io client.
+- `public/compositor/compositor.css` — Base CSS: fixed 1920x1080 canvas, brand-strip sizing, layout-root flex container, and `.stream-tile` shared tile styles.
+- `public/compositor/compositor.js` — Entry point IIFE. Connects to Socket.io, handles `state:sync`, `scoreboard:update`, `activeRuns:update`, `director:state`, and `run:complete` events. Drives layout switching and per-frame updates.
+- `public/compositor/layouts/layout-a.js` — Stub for Layout A (2-stream + mini-leaderboard).
+- `public/compositor/layouts/layout-c.js` — Stub for Layout C (4-stream grid).
+- `public/compositor/layouts/layout-lb.js` — Stub for Layout LB (full leaderboard).
+- `public/compositor/layouts/layout-bt.js` — Stub for Layout BT (best-times).
+- `public/compositor/components/brand-strip.js` — Stub for the top bar renderer (`window.BrandStrip`).
+- `public/compositor/components/mini-leaderboard.js` — Stub (`window.MiniLeaderboard`).
+- `public/compositor/components/full-leaderboard.js` — Stub (`window.FullLeaderboard`).
+- `public/compositor/components/dungeon-hud.js` — Stub (`window.DungeonHud`).
+- `public/compositor/components/alt-card.js` — Stub (`window.AltCard`).
+- `public/js/twitch-embed-manager.js` — Stub (`window.TwitchEmbedManager`) with `syncTeams`, `mountInto`, and `setMainAudio` no-ops. Will be replaced in Task 7.
+
+### Improvements
+- **`src/webServer.js` serves `/compositor`** — Added `app.use('/compositor', express.static(...))` so the compositor page is accessible at `http://localhost:3000/compositor/`.
+
 ### Improvements
 - **`twitchChannel` field added to team records** — `wclStorage.ensureTeamDefaults` now includes `twitch_channel: ''` so all new and reloaded teams carry the field. `updateTeam` accepts and persists the value. `stateManager.refreshTeams` maps it to `twitchChannel` in the frontend team shape. The `admin:updateTeam` socket handler in `webServer.js` accepts and forwards the field. The admin dashboard edit modal gains a "Twitch Channel" text input that populates on open and is included in the save payload via `socket-client.js`.
 

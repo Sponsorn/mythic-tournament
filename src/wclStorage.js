@@ -44,6 +44,7 @@ function ensureTeamDefaults(team) {
     wcl_backup_url: team?.wcl_backup_url || '',
     team_number: Number.isFinite(Number(team?.team_number)) ? Number(team.team_number) : null,
     bracket: VALID_BRACKETS.includes(bracket) ? bracket : 'A',
+    twitch_channel: team?.twitch_channel || '',
   };
 }
 
@@ -143,7 +144,7 @@ function upsertTeam({ teamName, leaderName, wclUrl, wclBackupUrl }) {
   return { status: 'created', team };
 }
 
-function updateTeam({ teamName, teamNumber, leaderName, wclUrl, wclBackupUrl, bracket }) {
+function updateTeam({ teamName, teamNumber, leaderName, wclUrl, wclBackupUrl, bracket, twitchChannel }) {
   const data = loadData();
   let target = null;
   if (Number.isFinite(Number(teamNumber))) {
@@ -161,6 +162,9 @@ function updateTeam({ teamName, teamNumber, leaderName, wclUrl, wclBackupUrl, br
   if (bracket !== undefined) {
     const bracketUpper = String(bracket || 'A').toUpperCase();
     target.bracket = VALID_BRACKETS.includes(bracketUpper) ? bracketUpper : target.bracket;
+  }
+  if (twitchChannel !== undefined) {
+    target.twitch_channel = String(twitchChannel || '').trim();
   }
   saveData();
   return { status: 'updated', team: target };

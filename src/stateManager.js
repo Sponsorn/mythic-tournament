@@ -49,6 +49,7 @@ class StateManager extends EventEmitter {
       wclUrl: team.wcl_url || '',
       wclBackupUrl: team.wcl_backup_url || '',
       bracket: team.bracket || 'A',
+      twitchChannel: team.twitch_channel || '',
       status: 'idle', // 'idle', 'running', 'completed'
       lastRun: meta[team.team_name]?.last || null,
       runCount: meta[team.team_name]?.runs || 0,

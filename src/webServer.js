@@ -268,7 +268,7 @@ function createWebServer(config = {}) {
         socket.emit('admin:response', { success: false, message: validationError });
         return;
       }
-      const { originalName, newTeamName, leaderName, reportCode, backupCode, bracket } = data;
+      const { originalName, newTeamName, leaderName, reportCode, backupCode, bracket, twitchChannel } = data;
 
       const code = wclExtractCode(reportCode);
       const backup = backupCode ? wclExtractCode(backupCode) : null;
@@ -286,6 +286,7 @@ function createWebServer(config = {}) {
         wclUrl: code ? `https://www.warcraftlogs.com/reports/${code}` : '',
         wclBackupUrl: backup ? `https://www.warcraftlogs.com/reports/${backup}` : undefined,
         bracket: bracket,
+        twitchChannel: twitchChannel !== undefined ? twitchChannel : undefined,
       });
 
       // If team name changed, rename in leaderboard and update team record

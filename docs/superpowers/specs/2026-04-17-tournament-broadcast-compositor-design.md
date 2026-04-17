@@ -51,6 +51,7 @@ A new `directorState` slice on `stateManager`, persisted to `data/director-state
     pinnedSlide: null | 'brand' | 'commands' | 'info',  // null = auto-rotate
     rotationMs: 12000
   },
+  mainAudioUnmuted: false,      // true only in A/D; ignored elsewhere
   infoboxHtml: '<string>',      // free-form HTML, same source as alt-card "info" slide
   commandsList: ['!tournament', '!guild', ...],
   tournamentContext: {
@@ -68,6 +69,7 @@ New Socket.io events:
 - `director:setLayout` — `{ layout: 'A' }`
 - `director:setSlot` — `{ slot: 'main' | 'grid[2]' | 'quad[0]' | 'strip[3]', team: 'teamName' }`
 - `director:setPinnedSlide` — `{ slide: 'brand' | 'commands' | 'info' | null }`
+- `director:setMainAudio` — `{ unmuted: true | false }` (only effective in A/D)
 - `director:setInfoboxHtml` — `{ html: '...' }`
 - `director:setCommandsList` — `{ commands: [...] }`
 - `director:obsScene` — `{ scene: 'Main' | 'Technical' | 'Break' }` → server forwards to OBS WebSocket
@@ -190,7 +192,7 @@ https://player.twitch.tv/?channel={twitchChannel}&parent={hostname}&muted=true&a
 - **Quality is forced via the Twitch Embed JavaScript API**, not URL param (the `quality` URL param is not a stable interface on `player.twitch.tv`). After the embed loads, the compositor calls `player.setQuality('720p30')` (or the closest available rendition) on each embed. This reduces CPU on the host and reduces the impact of teams streaming at 1440p without partner transcoding.
 - Default target: `720p30` for streams shown in main/focused slots; `480p30` for off-focus slots (thumbnail strip in D, non-main grid tiles in C, quad non-main in G). If a target rendition isn't available for a given stream, fall back to the next-lowest. Never select `chunked` (source) or `720p60`.
 - The caster panel's multiview thumbnails also force `480p30` to keep commentator machines responsive.
-- `muted=true` — OBS captures the compositor window silently; teams' voice chat is not broadcast. (If team POV audio ever needs to broadcast, that's a future feature.)
+- **Audio** — default `muted=true` on every embed to prevent cacophony. In layouts with a clear focused stream (A and D), the **main slot is unmutable**: the caster panel has an "unmute focused stream" toggle (default off). When toggled on, the compositor calls `player.setMuted(false)` on the main embed only — all other embeds remain muted regardless. Swapping focused team automatically mutes the outgoing team and unmutes the incoming one (if the toggle is on). In C/G/LB/BT the toggle is disabled (no single focused stream). Team voice-chat audio, commentary, dungeon sounds, etc. are what comes through when unmuted.
 - `parent={hostname}` — must match whatever domain the compositor is served from (localhost during dev, production host during broadcast).
 
 ## Caster control panel (`/caster`)
@@ -229,6 +231,7 @@ Separate page, also served by the Node server, protected by `ADMIN_SECRET` query
 - **Multiview**: all 6-7 team streams shown as small thumbnails (Twitch embeds at 320×180, same quality param). Each thumbnail is a **draggable chip** representing that team.
 - **Slot drop zones**: rendered inside the program-view mirror, at the positions corresponding to the active layout (e.g. in A, only the "main" slot is a drop target; in C, all six grid positions are). Drop → emit `director:setSlot`.
 - **Alt card slide radios**: auto + 3 slide options. Click → emit `director:setPinnedSlide`.
+- **Main audio toggle**: a single "🔊 unmute focused stream" switch. Disabled when the active layout isn't A or D. Click → emit `director:setMainAudio`. State badge reminds the commentator when it's live ("FOCUSED STREAM IS ON-AIR").
 - **Content editors**: textarea for infobox HTML (free-form, admin-trusted), text list for commands. Save button emits the corresponding `director:set*` events.
 - **State panel**: current leaderboard + last 10 runs (completed, with team/dungeon/level/upgrades/points). Useful commentator reference.
 
@@ -286,7 +289,10 @@ After: three scenes.
 
 1. **Main**
    - One browser source: `http://localhost:3000/compositor`, 1920×1080
-   - Audio: game audio from the host if available, otherwise silent; commentator Discord audio layered on top via the existing workflow.
+   - **Audio — compositor track**: the browser source's audio output. Silent unless the caster panel unmutes the focused team (A/D only). When unmuted, you hear that team's stream audio.
+   - **Audio — commentary track**: commentator Discord voice, layered on top via the existing workflow. Always on.
+   - **Audio — BGM track** (optional): background music (e.g., YouTube on a separate system audio channel) on its own OBS source. Independent of the compositor. Ducks manually or via OBS audio filters when commentary is active.
+   - All three tracks mix in OBS as today. The compositor just owns whether the focused team's stream audio is part of the mix.
 
 2. **Technical difficulties**
    - Same as current.

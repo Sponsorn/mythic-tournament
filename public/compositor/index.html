@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>M+ Tournament Compositor</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/compositor/compositor.css">
+</head>
+<body>
+  <div id="compositor" class="compositor layout-A">
+    <div id="brandStrip" class="brand-strip"></div>
+    <div id="layoutRoot" class="layout-root"></div>
+  </div>
+  <script src="https://player.twitch.tv/js/embed/v1.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  <script src="/js/twitch-embed-manager.js"></script>
+  <script src="/compositor/components/brand-strip.js"></script>
+  <script src="/compositor/components/mini-leaderboard.js"></script>
+  <script src="/compositor/components/full-leaderboard.js"></script>
+  <script src="/compositor/components/dungeon-hud.js"></script>
+  <script src="/compositor/components/alt-card.js"></script>
+  <script src="/compositor/layouts/layout-a.js"></script>
+  <script src="/compositor/layouts/layout-c.js"></script>
+  <script src="/compositor/layouts/layout-lb.js"></script>
+  <script src="/compositor/layouts/layout-bt.js"></script>
+  <script src="/compositor/compositor.js"></script>
+</body>
+</html>

@@ -77,6 +77,7 @@ function createWebServer(config = {}) {
   // Serve static files from public directory
   const publicPath = path.join(__dirname, '..', 'public');
   app.use(express.static(publicPath));
+  app.use('/compositor', express.static(path.join(__dirname, '..', 'public', 'compositor')));
   app.use(express.json());
 
   // HTTP route for OBS WebSocket (for non-upgrade requests)

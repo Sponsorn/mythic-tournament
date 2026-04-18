@@ -2,6 +2,9 @@
 
 ## 2026-04-18
 
+### Bug Fixes
+- **Twitch embed manager lifecycle hardening** — `public/js/twitch-embed-manager.js` now (1) detects `twitchChannel` changes in `syncTeams` and rebuilds the embed, (2) captures the `PLAYING` handler as a named reference and removes it on teardown, (3) introduces an `applyDesiredState(embed)` helper that re-asserts desired quality and mute whenever state changes or the player becomes operational, and (4) drops the dead `allMuted`/`unmutedTeam` variables. Teardown is now centralized in `teardownEmbed(name)` and used by both the channel-change and disappeared-team branches.
+
 ### Improvements
 - **Real Twitch embed manager with pre-instantiation** — `public/js/twitch-embed-manager.js` replaced with full implementation. Creates a hidden off-screen host appended to `document.body` at load time. `syncTeams(teams)` pre-instantiates one `Twitch.Player` per team with a `twitchChannel`, parked in the hidden host at `480p30`. `mountInto(teamName, slotEl, {focused})` moves the player's DOM node into the target slot (preserving player state to avoid ad-roll reconnections), and bumps quality to `720p30` when focused. `setMainAudio(unmuted, focusedTeam)` mutes/unmutes players so only the focused team is audible. Added `detachAll()` to return every embed back to the hidden host. Teams with empty `twitchChannel` are skipped; missing embeds render a `.stream-tile-offline` placeholder. Corresponding `.twitch-embed-host iframe` and `.stream-tile-offline` styles appended to `public/compositor/compositor.css`.
 

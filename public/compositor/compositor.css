@@ -153,8 +153,8 @@ html, body {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-rows: 1fr 120px;
-  grid-template-columns: 3fr 2fr 2fr;
+  grid-template-rows: 1fr 150px;
+  grid-template-columns: 3fr 3fr 2fr;
   gap: 6px;
   padding: 6px;
 }
@@ -252,6 +252,7 @@ html, body {
   gap: 4px;
   color: #e8ecf4;
   font-size: 15px;
+  overflow: hidden;
 }
 .lb-card-header {
   text-transform: uppercase;

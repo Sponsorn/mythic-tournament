@@ -147,3 +147,188 @@ html, body {
   font-size: 16px;
   font-weight: 600;
 }
+
+/* ── Layout A ───────────────────────────────────────────── */
+.compositor.layout-A .la-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr 120px;
+  grid-template-columns: 3fr 2fr 2fr;
+  gap: 6px;
+  padding: 6px;
+}
+.compositor.layout-A .la-main {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  background: #0a0a0f;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.compositor.layout-A .la-hud { grid-column: 1; grid-row: 2; }
+.compositor.layout-A .la-lb  { grid-column: 2; grid-row: 2; }
+.compositor.layout-A .la-alt { grid-column: 3; grid-row: 2; }
+
+.la-main-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.la-main-overlay .tile-label {
+  position: absolute;
+  bottom: 12px;
+  left: 16px;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 4px 12px;
+  background: rgba(0,0,0,0.65);
+  border-radius: 3px;
+  color: #fff;
+}
+.la-main-overlay .tile-keylevel {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 22px;
+  padding: 4px 12px;
+  background: rgba(74, 158, 255, 0.85);
+  border-radius: 4px;
+  color: #fff;
+}
+
+/* HUD card */
+.hud-card {
+  height: 100%;
+  background: rgba(15, 15, 22, 0.92);
+  border-radius: 4px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #e8ecf4;
+  font-size: 18px;
+}
+.hud-rank {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #ffd700;
+  background: rgba(255,215,0,0.12);
+  padding: 2px 10px;
+  border-radius: 3px;
+}
+.hud-team { font-weight: 700; color: #fff; }
+.hud-dungeon {
+  color: var(--text-muted);
+  border-left: 1px solid #2e2e36;
+  padding-left: 14px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hud-level {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-blue);
+}
+.hud-points {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Mini leaderboard */
+.lb-card {
+  height: 100%;
+  background: rgba(15, 15, 22, 0.92);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 4px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #e8ecf4;
+  font-size: 15px;
+}
+.lb-card-header {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.lb-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 2px;
+}
+.lb-row .lb-rank.gold   { color: #ffd700; }
+.lb-row .lb-rank.silver { color: #c0c0c0; }
+.lb-row .lb-rank.bronze { color: #cd7f32; }
+.lb-row .lb-points { font-family: var(--font-mono); font-weight: 700; }
+.delta-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 2px;
+}
+
+/* Result flash */
+@keyframes lb-flash-pulse {
+  0%, 100% { background: linear-gradient(90deg, rgba(74,222,128,0.35), rgba(74,222,128,0.1)); }
+  50%      { background: linear-gradient(90deg, rgba(74,222,128,0.55), rgba(74,222,128,0.2)); }
+}
+.lb-row.flash {
+  animation: lb-flash-pulse 1.4s ease-in-out infinite;
+}
+
+/* Alt card */
+.alt-card {
+  height: 100%;
+  background: rgba(15, 15, 22, 0.92);
+  border-left: 3px solid #a366ff;
+  border-radius: 4px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  color: #e8ecf4;
+  font-size: 15px;
+  overflow: hidden;
+}
+.alt-card-header {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 11px;
+  color: #a366ff;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.alt-card-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.alt-slide--brand { text-align: center; }
+.alt-brand-logo { width: 42px; height: 42px; border-radius: 6px; object-fit: contain; }
+.alt-brand-name { font-weight: 700; font-size: 15px; color: #fff; margin-top: 4px; }
+.alt-brand-tag { font-size: 11px; color: var(--text-muted); }
+.alt-slide--commands code {
+  background: rgba(74, 222, 128, 0.12);
+  color: #4ade80;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin: 2px;
+  display: inline-block;
+}

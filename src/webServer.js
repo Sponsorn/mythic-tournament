@@ -213,6 +213,15 @@ function createWebServer(config = {}) {
     }
   });
 
+  // TEMPORARY: run-complete trigger for manual smoke testing.
+  // Guarded so this never ships active in production.
+  if (process.env.NODE_ENV !== 'production') {
+    app.post('/api/test/run-complete', express.json(), (req, res) => {
+      stateManager.emit('run:complete', req.body);
+      res.json({ ok: true });
+    });
+  }
+
   // Health check
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', time: Date.now() });

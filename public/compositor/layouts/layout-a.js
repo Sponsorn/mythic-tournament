@@ -1,10 +1,77 @@
-window.LayoutA = {
-  mount(root) {
-    root.innerHTML = '<div style="padding:24px;color:#fff">Layout A (stub)</div>';
-    return {
-      update() {},
-      unmount() {},
-      onRunComplete() {},
-    };
-  },
-};
+(function () {
+  'use strict';
+
+  function mount(root) {
+    root.innerHTML = `
+      <div class="la-grid">
+        <div class="la-main"></div>
+        <div class="la-hud"></div>
+        <div class="la-lb"></div>
+        <div class="la-alt"></div>
+      </div>
+    `;
+    const mainEl = root.querySelector('.la-main');
+    const hudEl = root.querySelector('.la-hud');
+    const lbEl = root.querySelector('.la-lb');
+    const altEl = root.querySelector('.la-alt');
+
+    let lastState = null;
+
+    function update(state) {
+      lastState = state;
+      const featuredName = state.directorState?.slots?.main;
+      const team = (state.teams || []).find(t => t.name === featuredName);
+      const lbEntry = (state.leaderboard || []).find(e => e.teamName === featuredName);
+      const run = (state.activeRuns || []).find(r => r.teamName === featuredName);
+
+      if (featuredName) {
+        if (window.TwitchEmbedManager) {
+          window.TwitchEmbedManager.mountInto(featuredName, mainEl, { focused: true });
+        }
+        ensureOverlay(mainEl, featuredName, run);
+      } else {
+        mainEl.innerHTML = '<div class="stream-tile-offline">No team selected</div>';
+      }
+
+      window.DungeonHud.render(hudEl, {
+        team,
+        run,
+        rank: lbEntry?.rank,
+        points: lbEntry?.points || 0,
+      });
+      window.MiniLeaderboard.render(lbEl, { leaderboard: state.leaderboard });
+      window.AltCard.render(altEl, { directorState: state.directorState });
+    }
+
+    function ensureOverlay(el, teamName, run) {
+      let overlay = el.querySelector('.la-main-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'la-main-overlay';
+        el.appendChild(overlay);
+      }
+      const level = run && run.keystoneLevel ? `+${run.keystoneLevel}` : '';
+      const dungeon = run && run.dungeonName ? ` — ${escapeHtml(run.dungeonName)}` : '';
+      overlay.innerHTML = `
+        <div class="tile-label">${escapeHtml(teamName)}${dungeon}</div>
+        ${level ? `<div class="tile-keylevel">${level}</div>` : ''}
+      `;
+    }
+
+    function onRunComplete(payload) {
+      window.MiniLeaderboard.flash(lbEl, payload.teamName, payload.pointsEarned);
+    }
+
+    function unmount() {
+      if (window.TwitchEmbedManager) window.TwitchEmbedManager.detachAll();
+    }
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    return { update, unmount, onRunComplete };
+  }
+
+  window.LayoutA = { mount };
+})();

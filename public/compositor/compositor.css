@@ -333,3 +333,63 @@ html, body {
   margin: 2px;
   display: inline-block;
 }
+
+/* Full leaderboard (Layout C sidebar / Layout LB) */
+.flb-card {
+  height: 100%;
+  background: rgba(15,15,22,0.95);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.flb-header {
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.flb-rows { flex: 1; padding: 8px; overflow: hidden; display: flex; flex-direction: column; gap: 4px; }
+.flb-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(40,40,50,0.45);
+  border-radius: 3px;
+  color: #e8ecf4;
+}
+.flb-row .flb-rank {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: right;
+  color: var(--text-muted);
+}
+.flb-row .flb-rank.gold   { color: #ffd700; }
+.flb-row .flb-rank.silver { color: #c0c0c0; }
+.flb-row .flb-rank.bronze { color: #cd7f32; }
+.flb-row .flb-name {
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flb-row .flb-runs {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  margin-right: 8px;
+}
+.flb-row .flb-points {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.flb-row.flash {
+  animation: lb-flash-pulse 1.4s ease-in-out infinite;
+}

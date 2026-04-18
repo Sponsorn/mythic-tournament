@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-18
+
+### Improvements
+- **Compositor brand strip renders live tournament progress bar** — `public/compositor/components/brand-strip.js` now renders the logo, title, a segmented progress bar (pre-event gold, live blue/purple, post-event green, idle grey), and the scheduled start/end times. The bar fills over the last 6 hours before start, tracks elapsed percentage during the event, and shows "Event ended" / "Schedule not set" fallbacks. Corresponding styles added to `public/compositor/compositor.css`.
+
+### Tests
+- Added `tests/progressBar.test.js` — Covers pre-event, during-event (~50% at halfway), post-event, and missing-schedule rendering paths of `BrandStrip.renderAt`.
+
 ## 2026-04-17
 
 ### New Files

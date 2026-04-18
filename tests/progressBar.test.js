@@ -8,8 +8,14 @@ const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
 global.window = dom.window;
 global.document = dom.window.document;
 
-const src = fs.readFileSync(path.join(__dirname, '..', 'public/compositor/components/brand-strip.js'), 'utf8');
-new Function('window', 'document', src)(dom.window, dom.window.document);
+const files = [
+  'public/compositor/components/_util.js',
+  'public/compositor/components/brand-strip.js',
+];
+for (const f of files) {
+  const src = fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+  new Function('window', 'document', src)(dom.window, dom.window.document);
+}
 const BrandStrip = dom.window.BrandStrip;
 
 test('progress bar before start shows "Starts in" and gold fill', () => {

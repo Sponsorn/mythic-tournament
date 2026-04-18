@@ -14,11 +14,13 @@
       `;
     } else if (slide === 'commands') {
       const list = (directorState?.commandsList || []).map(c =>
-        `<code>${escapeHtml(c)}</code>`
+        `<code>${window.Compositor.escapeHtml(c)}</code>`
       ).join(' ');
       body = `<div class="alt-slide alt-slide--commands">${list || 'No commands configured'}</div>`;
     } else {
       const html = directorState?.infoboxHtml || 'No info set';
+      // infoboxHtml is admin-provided HTML; trust boundary is the /api/director
+      // auth gate (unauthenticated in Phase 1, tightened in Phase 2).
       body = `<div class="alt-slide alt-slide--info">${html}</div>`;
     }
     el.innerHTML = `
@@ -33,9 +35,6 @@
 
   function labelFor(slide) {
     return { brand: 'Brand', commands: 'Commands', info: 'Info' }[slide] || slide;
-  }
-  function escapeHtml(s) {
-    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   window.AltCard = { render };

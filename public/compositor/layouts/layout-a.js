@@ -15,10 +15,7 @@
     const lbEl = root.querySelector('.la-lb');
     const altEl = root.querySelector('.la-alt');
 
-    let lastState = null;
-
     function update(state) {
-      lastState = state;
       const featuredName = state.directorState?.slots?.main;
       const team = (state.teams || []).find(t => t.name === featuredName);
       const lbEntry = (state.leaderboard || []).find(e => e.teamName === featuredName);
@@ -36,8 +33,8 @@
       window.DungeonHud.render(hudEl, {
         team,
         run,
-        rank: lbEntry?.rank,
-        points: lbEntry?.points || 0,
+        rank: lbEntry?.rank ?? null,
+        points: lbEntry?.points ?? 0,
       });
       window.MiniLeaderboard.render(lbEl, { leaderboard: state.leaderboard });
       window.AltCard.render(altEl, { directorState: state.directorState });
@@ -51,9 +48,9 @@
         el.appendChild(overlay);
       }
       const level = run && run.keystoneLevel ? `+${run.keystoneLevel}` : '';
-      const dungeon = run && run.dungeonName ? ` — ${escapeHtml(run.dungeonName)}` : '';
+      const dungeon = run && run.dungeonName ? ` — ${window.Compositor.escapeHtml(run.dungeonName)}` : '';
       overlay.innerHTML = `
-        <div class="tile-label">${escapeHtml(teamName)}${dungeon}</div>
+        <div class="tile-label">${window.Compositor.escapeHtml(teamName)}${dungeon}</div>
         ${level ? `<div class="tile-keylevel">${level}</div>` : ''}
       `;
     }
@@ -64,10 +61,6 @@
 
     function unmount() {
       if (window.TwitchEmbedManager) window.TwitchEmbedManager.detachAll();
-    }
-
-    function escapeHtml(s) {
-      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     return { update, unmount, onRunComplete };

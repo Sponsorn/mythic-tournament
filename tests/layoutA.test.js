@@ -17,6 +17,7 @@ function loadCompositor() {
   };
 
   const files = [
+    'public/compositor/components/_util.js',
     'public/compositor/components/brand-strip.js',
     'public/compositor/components/mini-leaderboard.js',
     'public/compositor/components/full-leaderboard.js',

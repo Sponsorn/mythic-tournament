@@ -48,18 +48,13 @@
 
     el.innerHTML = `
       <img src="/images/luckywipelogo.png" alt="" class="brand-logo">
-      <span class="brand-title">${escapeHtml(title || 'M+ Tournament')}</span>
+      <span class="brand-title">${window.Compositor.escapeHtml(title || 'M+ Tournament')}</span>
       <div class="brand-progress">
         <div class="brand-progress-fill ${fillClass}" style="width: ${widthPct.toFixed(1)}%"></div>
-        <div class="brand-progress-label">${escapeHtml(label)}</div>
+        <div class="brand-progress-label">${window.Compositor.escapeHtml(label)}</div>
       </div>
-      <span class="brand-time-right">${escapeHtml(rightText)}</span>
+      <span class="brand-time-right">${window.Compositor.escapeHtml(rightText)}</span>
     `;
-  }
-
-  function escapeHtml(s) {
-    return String(s || '')
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   function render(el, { directorState }) {

@@ -9,8 +9,8 @@
     const rows = top.map((e, i) => {
       const medalClass = ['gold', 'silver', 'bronze'][i] || '';
       return `
-        <div class="lb-row" data-team="${escapeHtml(e.teamName)}">
-          <span class="lb-rank ${medalClass}">${e.rank} ${escapeHtml(e.teamName)}</span>
+        <div class="lb-row" data-team="${window.Compositor.escapeHtml(e.teamName)}">
+          <span class="lb-rank ${medalClass}">${e.rank} ${window.Compositor.escapeHtml(e.teamName)}</span>
           <span class="lb-points">${Number(e.points || 0)}</span>
         </div>
       `;
@@ -25,7 +25,7 @@
 
   function flash(el, teamName, pointsEarned) {
     if (!el || !teamName) return;
-    const row = el.querySelector(`.lb-row[data-team="${cssEscape(teamName)}"]`);
+    const row = el.querySelector(`.lb-row[data-team="${window.Compositor.cssEscape(teamName)}"]`);
     if (!row) return;
 
     const pointsEl = row.querySelector('.lb-points');
@@ -49,13 +49,6 @@
       flashTimers.delete(row);
     }, FLASH_MS);
     flashTimers.set(row, t);
-  }
-
-  function cssEscape(s) {
-    return String(s || '').replace(/["\\]/g, '\\$&');
-  }
-  function escapeHtml(s) {
-    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   window.MiniLeaderboard = { render, flash };

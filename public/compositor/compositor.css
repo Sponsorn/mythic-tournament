@@ -129,3 +129,21 @@ html, body {
   color: var(--text-muted);
   white-space: nowrap;
 }
+
+.twitch-embed-host iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0;
+}
+
+.stream-tile-offline {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2a2a35, #1a1a22);
+  color: var(--text-muted);
+  font-size: 16px;
+  font-weight: 600;
+}

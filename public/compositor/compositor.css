@@ -72,3 +72,60 @@ html, body {
   padding: 2px 8px;
   border-radius: 3px;
 }
+
+.brand-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.brand-title {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.brand-progress {
+  flex: 1;
+  height: 14px;
+  position: relative;
+  background: #0a0a0f;
+  border: 1px solid #2e2e36;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.brand-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  transition: width 1s linear;
+}
+.brand-progress-fill--pre  { background: linear-gradient(90deg, #ffd700, #ff9500); }
+.brand-progress-fill--live { background: linear-gradient(90deg, #4a9eff, #a366ff); }
+.brand-progress-fill--post { background: linear-gradient(90deg, #4ade80, #22c55e); }
+.brand-progress-fill--idle { background: #2e2e36; }
+
+.brand-progress-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 4px rgba(0,0,0,0.8);
+  white-space: nowrap;
+}
+
+.brand-time-right {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

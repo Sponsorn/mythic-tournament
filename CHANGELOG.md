@@ -3,6 +3,9 @@
 ## 2026-04-18
 
 ### Improvements
+- **Real Twitch embed manager with pre-instantiation** — `public/js/twitch-embed-manager.js` replaced with full implementation. Creates a hidden off-screen host appended to `document.body` at load time. `syncTeams(teams)` pre-instantiates one `Twitch.Player` per team with a `twitchChannel`, parked in the hidden host at `480p30`. `mountInto(teamName, slotEl, {focused})` moves the player's DOM node into the target slot (preserving player state to avoid ad-roll reconnections), and bumps quality to `720p30` when focused. `setMainAudio(unmuted, focusedTeam)` mutes/unmutes players so only the focused team is audible. Added `detachAll()` to return every embed back to the hidden host. Teams with empty `twitchChannel` are skipped; missing embeds render a `.stream-tile-offline` placeholder. Corresponding `.twitch-embed-host iframe` and `.stream-tile-offline` styles appended to `public/compositor/compositor.css`.
+
+### Improvements
 - **Compositor brand strip renders live tournament progress bar** — `public/compositor/components/brand-strip.js` now renders the logo, title, a segmented progress bar (pre-event gold, live blue/purple, post-event green, idle grey), and the scheduled start/end times. The bar fills over the last 6 hours before start, tracks elapsed percentage during the event, and shows "Event ended" / "Schedule not set" fallbacks. Corresponding styles added to `public/compositor/compositor.css`.
 
 ### Tests

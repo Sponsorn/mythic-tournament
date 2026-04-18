@@ -2,6 +2,9 @@
 
 ## 2026-04-18
 
+### Improvements
+- **Task 8: Layout A implemented** — Replaced layout-a.js stub with a full grid layout (main embed + dungeon HUD + mini-leaderboard + alt-card). `DungeonHud`, `MiniLeaderboard`, and `AltCard` components now render real content; `MiniLeaderboard.flash()` adds an 8-second pulsing highlight and `+N` delta badge on `run:complete`. Added NODE_ENV-guarded `/api/test/run-complete` endpoint for manual smoke testing. Layout CSS appended to `public/compositor/compositor.css`. Added `tests/layoutA.test.js` covering mount, update, and onRunComplete flows.
+
 ### Bug Fixes
 - **Twitch embed manager lifecycle hardening** — `public/js/twitch-embed-manager.js` now (1) detects `twitchChannel` changes in `syncTeams` and rebuilds the embed, (2) captures the `PLAYING` handler as a named reference and removes it on teardown, (3) introduces an `applyDesiredState(embed)` helper that re-asserts desired quality and mute whenever state changes or the player becomes operational, and (4) drops the dead `allMuted`/`unmutedTeam` variables. Teardown is now centralized in `teardownEmbed(name)` and used by both the channel-change and disappeared-team branches.
 

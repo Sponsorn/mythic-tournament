@@ -393,3 +393,35 @@ html, body {
 .flb-row.flash {
   animation: lb-flash-pulse 1.4s ease-in-out infinite;
 }
+
+/* ── Layout C ───────────────────────────────────────────── */
+.compositor.layout-C .lc-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 360px;
+  gap: 6px;
+  padding: 6px;
+}
+.compositor.layout-C .lc-tile {
+  position: relative;
+  background: #0a0a0f;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.compositor.layout-C .lc-tile:nth-child(1) { grid-column: 1; grid-row: 1; }
+.compositor.layout-C .lc-tile:nth-child(2) { grid-column: 2; grid-row: 1; }
+.compositor.layout-C .lc-tile:nth-child(3) { grid-column: 3; grid-row: 1; }
+.compositor.layout-C .lc-tile:nth-child(4) { grid-column: 1; grid-row: 2; }
+.compositor.layout-C .lc-tile:nth-child(5) { grid-column: 2; grid-row: 2; }
+.compositor.layout-C .lc-tile:nth-child(6) { grid-column: 3; grid-row: 2; }
+.compositor.layout-C .lc-sidebar {
+  grid-column: 4;
+  grid-row: 1 / -1;
+}
+.lc-tile-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}

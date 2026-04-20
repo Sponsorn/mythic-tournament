@@ -103,6 +103,13 @@
       slotEl.innerHTML = `<div class="stream-tile-offline">${escapeHtml(teamName)} — no stream</div>`;
       return;
     }
+    // Evict any OTHER embed currently parked in this slot
+    Object.values(embeds).forEach(e => {
+      if (e !== embed && e.currentParent === slotEl) {
+        hiddenHost.appendChild(e.container);
+        e.currentParent = hiddenHost;
+      }
+    });
     if (embed.currentParent !== slotEl) {
       slotEl.appendChild(embed.container);
       embed.currentParent = slotEl;
@@ -127,9 +134,19 @@
     });
   }
 
+  function detachFrom(slotEl) {
+    if (!slotEl) return;
+    Object.values(embeds).forEach(e => {
+      if (e.currentParent === slotEl) {
+        hiddenHost.appendChild(e.container);
+        e.currentParent = hiddenHost;
+      }
+    });
+  }
+
   function escapeHtml(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  window.TwitchEmbedManager = { syncTeams, mountInto, setMainAudio, detachAll };
+  window.TwitchEmbedManager = { syncTeams, mountInto, setMainAudio, detachAll, detachFrom };
 })();

@@ -20,12 +20,23 @@
       const grid = state.directorState?.slots?.grid || [];
       tileEls.forEach((tileEl, i) => {
         const teamName = grid[i];
-        tileEl.innerHTML = '';
+
+        // Clean up our own overlay + placeholder; leave embed container alone
+        const oldOverlay = tileEl.querySelector('.lc-tile-overlay');
+        if (oldOverlay) oldOverlay.remove();
+        const oldPlaceholder = tileEl.querySelector('.stream-tile-offline');
+        if (oldPlaceholder) oldPlaceholder.remove();
+
         if (!teamName) {
           tileEl.classList.add('lc-tile--empty');
-          tileEl.innerHTML = `<div class="stream-tile-offline">Slot ${i + 1} empty</div>`;
+          if (window.TwitchEmbedManager) window.TwitchEmbedManager.detachFrom(tileEl);
+          const placeholder = document.createElement('div');
+          placeholder.className = 'stream-tile-offline';
+          placeholder.textContent = `Slot ${i + 1} empty`;
+          tileEl.appendChild(placeholder);
           return;
         }
+
         tileEl.classList.remove('lc-tile--empty');
         if (window.TwitchEmbedManager) {
           window.TwitchEmbedManager.mountInto(teamName, tileEl, { focused: false });

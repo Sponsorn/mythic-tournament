@@ -10,6 +10,7 @@ const { DUNGEON_PAR_MS, DUNGEON_SHORT_NAMES } = require('./wclScoring');
 const { CORS_ORIGINS, ADMIN_SECRET, OBS_WS_PORT } = require('./config');
 const runtimeConfig = require('./runtimeConfig');
 const directorState = require('./directorState');
+const { readBestTimes } = require('./bestTimes');
 
 let io = null;
 let server = null;
@@ -109,9 +110,7 @@ function createWebServer(config = {}) {
   });
 
   app.get('/api/best-times', (req, res) => {
-    const dungeon = req.query.dungeon || null;
-    const includeAll = req.query.includeAll === '1';
-    res.json(getBestRunsPerDungeon(dungeon, includeAll));
+    res.json(readBestTimes());
   });
 
   app.get('/api/dungeon-pars', (req, res) => {

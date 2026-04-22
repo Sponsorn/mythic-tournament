@@ -495,3 +495,84 @@ html, body {
 .llb-row.flash {
   animation: lb-flash-pulse 1.4s ease-in-out infinite;
 }
+
+/* ── Layout BT ──────────────────────────────────────────── */
+.compositor.layout-BT .lbt-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.lbt-panel {
+  width: 1600px;
+  max-height: 100%;
+  background: rgba(15,15,22,0.96);
+  border: 2px solid rgba(74, 158, 255, 0.4);
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.lbt-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 28px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.lbt-header-logo { width: 44px; height: 44px; border-radius: 6px; object-fit: contain; }
+.lbt-header-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+.lbt-grid {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+.lbt-cell {
+  background: rgba(40,40,50,0.5);
+  border-radius: 8px;
+  padding: 20px;
+  color: #e8ecf4;
+  border-left: 4px solid var(--accent-blue);
+}
+.lbt-cell-dungeon {
+  font-size: 16px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.lbt-cell-time {
+  font-family: var(--font-mono);
+  font-size: 40px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+.lbt-cell-meta {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+.lbt-cell-team { font-weight: 700; color: var(--accent-blue); }
+.lbt-cell-level { color: var(--text-muted); }
+.lbt-cell-upg { color: #ffd700; }
+.lbt-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 16px;
+}

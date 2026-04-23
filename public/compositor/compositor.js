@@ -61,19 +61,18 @@
       directorState: state.directorState,
     });
 
-    const desired = state.directorState.activeLayout;
+    let desired = state.directorState.activeLayout;
+    if (!layouts[desired]) {
+      console.warn(`[Compositor] Layout ${desired} not available in Phase 1, falling back to A`);
+      desired = 'A';
+    }
     if (desired !== activeLayoutName) {
       if (activeLayoutInstance && activeLayoutInstance.unmount) {
         activeLayoutInstance.unmount();
       }
       layoutRootEl.innerHTML = '';
       rootEl.className = `compositor layout-${desired}`;
-      const Layout = layouts[desired];
-      if (!Layout) {
-        console.warn('[Compositor] Unknown layout:', desired);
-        return;
-      }
-      activeLayoutInstance = Layout.mount(layoutRootEl);
+      activeLayoutInstance = layouts[desired].mount(layoutRootEl);
       activeLayoutName = desired;
     }
 

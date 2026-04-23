@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-04-23
+
+### Improvements
+- **Task 15: Compositor layout fallback** — `public/compositor/compositor.js` now falls back to Layout A (with a console warning) when `directorState.activeLayout` is a layout not implemented in Phase 1 (`PRE`, `D`, `G`). Previously the page would render only the brand strip with a stale `layout-${unknown}` className and no layout content. The unknown-branch dead code was also removed.
+- **Task 14: OBS setup guide** — Added `docs/compositor-obs-setup.md` covering one-time Browser-source setup, Twitch Turbo login via Interact for ad-free embeds, per-layout curl commands, troubleshooting, and the end-to-end verification checklist.
+
 ## 2026-04-18
 
 ### Improvements

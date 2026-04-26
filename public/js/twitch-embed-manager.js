@@ -5,11 +5,13 @@
   const QUALITY_OFFSCREEN = '480p30';
 
   const embeds = {}; // teamName → { player, container, channel, lastQuality, currentParent, onPlaying, desiredQuality, desiredMuted }
-  // Hidden host stays on-screen with opacity:0 + z-index:-1 so CEF/OBS
-  // treats parked embeds as "visible" — off-screen positioning makes
-  // intersection-observer-aware autoplay-policies block playback.
+  // Twitch's embed enforces autoplay-visibility itself: it reads
+  // computed opacity, visibility, and display via getComputedStyle and
+  // refuses to play if anything looks hidden. We use clip-path:inset(50%)
+  // to make parked embeds visually invisible while leaving those
+  // computed styles untouched.
   const hiddenHost = document.createElement('div');
-  hiddenHost.style.cssText = 'position:absolute;left:0;top:0;width:640px;height:360px;pointer-events:none;opacity:0;z-index:-1;';
+  hiddenHost.style.cssText = 'position:absolute;left:0;top:0;width:640px;height:360px;pointer-events:none;clip-path:inset(50%);';
   document.body.appendChild(hiddenHost);
 
   function applyDesiredState(embed) {

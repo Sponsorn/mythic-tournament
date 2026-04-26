@@ -14,7 +14,7 @@ npm test -- tests/progressBar.test.js
 ## Compositor
 
 ```
-http://localhost:3000/compositor/
+http://localhost:3030/compositor/
 ```
 
 Trailing slash matters.
@@ -26,16 +26,16 @@ Replaced in Phase 2 by authenticated Socket.io events.
 ### Inspect current state
 
 ```bash
-curl http://localhost:3000/api/director
+curl http://localhost:3030/api/director
 ```
 
 ### Switch layout
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d "{\"layout\":\"A\"}" http://localhost:3000/api/director
-curl -X POST -H "Content-Type: application/json" -d "{\"layout\":\"C\"}" http://localhost:3000/api/director
-curl -X POST -H "Content-Type: application/json" -d "{\"layout\":\"LB\"}" http://localhost:3000/api/director
-curl -X POST -H "Content-Type: application/json" -d "{\"layout\":\"BT\"}" http://localhost:3000/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"layout\":\"A\"}" http://localhost:3030/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"layout\":\"C\"}" http://localhost:3030/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"layout\":\"LB\"}" http://localhost:3030/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"layout\":\"BT\"}" http://localhost:3030/api/director
 ```
 
 Valid: `PRE | A | C | D | G | LB | BT`.
@@ -43,8 +43,8 @@ Valid: `PRE | A | C | D | G | LB | BT`.
 ### Assign team to a slot
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d "{\"slot\":\"main\",\"team\":\"ALPHA\"}" http://localhost:3000/api/director
-curl -X POST -H "Content-Type: application/json" -d "{\"slot\":\"main\",\"team\":null}" http://localhost:3000/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"slot\":\"main\",\"team\":\"ALPHA\"}" http://localhost:3030/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"slot\":\"main\",\"team\":null}" http://localhost:3030/api/director
 ```
 
 Valid slots: `main`, `grid[0]..[5]`, `quad[0]..[3]`, `strip[0]..[3]`. Team value is a team name (from `data/wcl.json`) or `null`.
@@ -52,21 +52,21 @@ Valid slots: `main`, `grid[0]..[5]`, `quad[0]..[3]`, `strip[0]..[3]`. Team value
 ### Toggle focused-stream audio (layouts A and D only)
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d "{\"mainAudioUnmuted\":true}"  http://localhost:3000/api/director
-curl -X POST -H "Content-Type: application/json" -d "{\"mainAudioUnmuted\":false}" http://localhost:3000/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"mainAudioUnmuted\":true}"  http://localhost:3030/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"mainAudioUnmuted\":false}" http://localhost:3030/api/director
 ```
 
 ### Pin an alt-card slide
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d "{\"pinnedSlide\":\"infobox\"}" http://localhost:3000/api/director
-curl -X POST -H "Content-Type: application/json" -d "{\"pinnedSlide\":null}" http://localhost:3000/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"pinnedSlide\":\"infobox\"}" http://localhost:3030/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"pinnedSlide\":null}" http://localhost:3030/api/director
 ```
 
 ### Set infobox HTML (Layout A bottom-middle card)
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d "{\"infoboxHtml\":\"<h3>Welcome to Lucky Wipe M+</h3><p>Round 1 starts at 16:00 ST</p>\"}" http://localhost:3000/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"infoboxHtml\":\"<h3>Welcome to Lucky Wipe M+</h3><p>Round 1 starts at 16:00 ST</p>\"}" http://localhost:3030/api/director
 ```
 
 Pass empty string to clear: `{"infoboxHtml":""}`. Renders raw HTML — admin trust boundary.
@@ -74,7 +74,7 @@ Pass empty string to clear: `{"infoboxHtml":""}`. Renders raw HTML — admin tru
 ### Set tournament context (brand strip progress bar)
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d "{\"tournamentContext\": {\"title\": \"Lucky Wipe M+ Tournament\", \"startSE\": \"2026-04-18T16:00:00+02:00\", \"endSE\": \"2026-04-18T22:00:00+02:00\"}}" http://localhost:3000/api/director
+curl -X POST -H "Content-Type: application/json" -d "{\"tournamentContext\": {\"title\": \"Lucky Wipe M+ Tournament\", \"startSE\": \"2026-04-18T16:00:00+02:00\", \"endSE\": \"2026-04-18T22:00:00+02:00\"}}" http://localhost:3030/api/director
 ```
 
 Progress states: `--pre` (gold, last 6h before start), `--live` (blue/purple, during), `--post` (green, after end), `--idle` (dim, no schedule).
@@ -98,10 +98,10 @@ Then restart the server. Defaults: `activeLayout: "A"`, all slots null, no pinne
 Guarded by `NODE_ENV !== 'production'`. Fires a `run:complete` event through stateManager — useful for testing the mini-leaderboard flash.
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d "{\"teamName\":\"BRAVO\",\"pointsEarned\":14,\"newTotal\":98,\"newRank\":2,\"previousRank\":3}" http://localhost:3000/api/test/run-complete
+curl -X POST -H "Content-Type: application/json" -d "{\"teamName\":\"BRAVO\",\"pointsEarned\":14,\"newTotal\":98,\"newRank\":2,\"previousRank\":3}" http://localhost:3030/api/test/run-complete
 ```
 
-Expected: the row for BRAVO in the mini-leaderboard (Layout A bottom-middle) pulses green for 8s with a `+14` badge.
+Expected: the BRAVO row in the active layout's leaderboard (sidebar in A/C, panel in LB) pulses green for 8s with a `+14` badge.
 
 ## Git
 

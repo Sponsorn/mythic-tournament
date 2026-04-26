@@ -9,11 +9,14 @@ const { wclExtractCode } = require('./wclApi');
 const { DUNGEON_PAR_MS, DUNGEON_SHORT_NAMES } = require('./wclScoring');
 const { CORS_ORIGINS, ADMIN_SECRET, OBS_WS_PORT } = require('./config');
 const runtimeConfig = require('./runtimeConfig');
+const directorState = require('./directorState');
+const { readBestTimes } = require('./bestTimes');
 
 let io = null;
 let server = null;
 let forceRefreshCallback = null;
 let stateListeners = [];
+let directorChangeHandler = null;
 
 function validateRequired(data, fields) {
   if (!data || typeof data !== 'object') return 'Invalid request data';
@@ -68,9 +71,14 @@ function createWebServer(config = {}) {
     },
   });
 
+  // Broadcast directorState changes to all connected clients
+  directorChangeHandler = (s) => io.emit('director:state', s);
+  directorState.on('change', directorChangeHandler);
+
   // Serve static files from public directory
   const publicPath = path.join(__dirname, '..', 'public');
   app.use(express.static(publicPath));
+  app.use('/compositor', express.static(path.join(__dirname, '..', 'public', 'compositor')));
   app.use(express.json());
 
   // HTTP route for OBS WebSocket (for non-upgrade requests)
@@ -102,9 +110,7 @@ function createWebServer(config = {}) {
   });
 
   app.get('/api/best-times', (req, res) => {
-    const dungeon = req.query.dungeon || null;
-    const includeAll = req.query.includeAll === '1';
-    res.json(getBestRunsPerDungeon(dungeon, includeAll));
+    res.json(readBestTimes());
   });
 
   app.get('/api/dungeon-pars', (req, res) => {
@@ -178,6 +184,48 @@ function createWebServer(config = {}) {
     res.json(runtimeConfig.getAll());
   });
 
+  // TEMPORARY Phase 1 test endpoint. Replaced in Phase 2 by authenticated
+  // Socket.io director:* events from the caster panel.
+  app.get('/api/director', (req, res) => {
+    res.json(directorState.getState());
+  });
+
+  app.post('/api/director', express.json(), (req, res) => {
+    const { layout, slot, team, pinnedSlide, mainAudioUnmuted } = req.body || {};
+    try {
+      if (layout !== undefined) directorState.setLayout(layout);
+      if (slot !== undefined) directorState.setSlot(slot, team ?? null);
+      if (pinnedSlide !== undefined) directorState.setPinnedSlide(pinnedSlide);
+      if (mainAudioUnmuted !== undefined) directorState.setMainAudio(mainAudioUnmuted);
+      // Also pass through tournamentContext directly (used by brand strip later)
+      if (req.body.tournamentContext !== undefined) {
+        directorState.state.tournamentContext = {
+          ...directorState.state.tournamentContext,
+          ...req.body.tournamentContext,
+        };
+        directorState._save();
+        directorState.emit('change', directorState.getState());
+      }
+      if (req.body.infoboxHtml !== undefined) {
+        directorState.state.infoboxHtml = String(req.body.infoboxHtml);
+        directorState._save();
+        directorState.emit('change', directorState.getState());
+      }
+      res.json({ ok: true, state: directorState.getState() });
+    } catch (err) {
+      res.status(400).json({ ok: false, error: err.message });
+    }
+  });
+
+  // TEMPORARY: run-complete trigger for manual smoke testing.
+  // Guarded so this never ships active in production.
+  if (process.env.NODE_ENV !== 'production') {
+    app.post('/api/test/run-complete', express.json(), (req, res) => {
+      stateManager.emit('run:complete', req.body);
+      res.json({ ok: true });
+    });
+  }
+
   // Health check
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', time: Date.now() });
@@ -200,6 +248,7 @@ function createWebServer(config = {}) {
 
     // Send full state on connect
     socket.emit('state:sync', stateManager.getFullState());
+    socket.emit('director:state', directorState.getState());
 
     // Admin: Update team report code (legacy)
     socket.on('admin:setReportCode', async (data) => {
@@ -233,7 +282,7 @@ function createWebServer(config = {}) {
         socket.emit('admin:response', { success: false, message: validationError });
         return;
       }
-      const { originalName, newTeamName, leaderName, reportCode, backupCode, bracket } = data;
+      const { originalName, newTeamName, leaderName, reportCode, backupCode, bracket, twitchChannel } = data;
 
       const code = wclExtractCode(reportCode);
       const backup = backupCode ? wclExtractCode(backupCode) : null;
@@ -251,6 +300,7 @@ function createWebServer(config = {}) {
         wclUrl: code ? `https://www.warcraftlogs.com/reports/${code}` : '',
         wclBackupUrl: backup ? `https://www.warcraftlogs.com/reports/${backup}` : undefined,
         bracket: bracket,
+        twitchChannel: twitchChannel !== undefined ? twitchChannel : undefined,
       });
 
       // If team name changed, rename in leaderboard and update team record
@@ -527,6 +577,12 @@ function stopServer() {
     stateManager.removeListener(event, handler);
   }
   stateListeners = [];
+
+  // Remove directorState listener to prevent leaks
+  if (directorChangeHandler) {
+    directorState.removeListener('change', directorChangeHandler);
+    directorChangeHandler = null;
+  }
 
   return new Promise((resolve) => {
     if (server) {

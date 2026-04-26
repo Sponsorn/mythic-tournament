@@ -171,6 +171,10 @@
           <label class="form-label">Backup Report Code (optional)</label>
           <input type="text" class="input" id="editBackupCode" placeholder="Optional backup report">
         </div>
+        <div class="form-group">
+          <label class="form-label">Twitch Channel</label>
+          <input type="text" class="input" id="editTwitchChannel" placeholder="e.g. luckywipe_alpha">
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
@@ -421,6 +425,7 @@
       document.getElementById('editBracket').value = team?.bracket || 'A';
       document.getElementById('editReportCode').value = code || '';
       document.getElementById('editBackupCode').value = backupCode || '';
+      document.getElementById('editTwitchChannel').value = team?.twitchChannel || '';
       editModal.classList.add('visible');
     }
 
@@ -435,13 +440,14 @@
       const bracket = document.getElementById('editBracket').value;
       const reportCode = document.getElementById('editReportCode').value;
       const backupCode = document.getElementById('editBackupCode').value;
+      const twitchChannel = document.getElementById('editTwitchChannel').value.trim();
 
       if (!newTeamName) {
         showToast('Team name is required', 'error');
         return;
       }
 
-      client.updateTeam(originalName, newTeamName, leaderName, reportCode, backupCode || null, bracket);
+      client.updateTeam(originalName, newTeamName, leaderName, reportCode, backupCode || null, bracket, twitchChannel);
       editModal.classList.remove('visible');
     });
 

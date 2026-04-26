@@ -49,6 +49,7 @@ class StateManager extends EventEmitter {
       wclUrl: team.wcl_url || '',
       wclBackupUrl: team.wcl_backup_url || '',
       bracket: team.bracket || 'A',
+      twitchChannel: team.twitch_channel || '',
       status: 'idle', // 'idle', 'running', 'completed'
       lastRun: meta[team.team_name]?.last || null,
       runCount: meta[team.team_name]?.runs || 0,
@@ -197,6 +198,21 @@ class StateManager extends EventEmitter {
 
   // Called when a run completes
   onRunComplete(teamName, runData) {
+    // Capture pre-completion leaderboard snapshot for delta computation
+    const prev = this.state.leaderboard.find(e => e.teamName === teamName);
+    const previousRank = prev ? prev.rank : null;
+    const previousTotal = prev ? prev.points : 0;
+    const pointsEarned = Number(runData.points || 0);
+
+    // Project the new total and rank based on the current leaderboard snapshot.
+    // A follow-up scoreboard:update will correct any drift after refreshLeaderboard().
+    const newTotal = previousTotal + pointsEarned;
+    const projected = [...this.state.leaderboard]
+      .map(e => e.teamName === teamName ? { ...e, points: newTotal } : e)
+      .sort((a, b) => b.points - a.points);
+    const newRankIndex = projected.findIndex(e => e.teamName === teamName);
+    const newRank = newRankIndex >= 0 ? newRankIndex + 1 : null;
+
     // Remove from active runs
     this.state.activeRuns = this.state.activeRuns.filter(r => r.teamName !== teamName);
 
@@ -227,7 +243,15 @@ class StateManager extends EventEmitter {
       this.state.recentRuns = this.state.recentRuns.slice(0, 10);
     }
 
-    this.emit('run:complete', { teamName, recap });
+    this.emit('run:complete', {
+      teamName,
+      pointsEarned,
+      newTotal,
+      newRank,
+      previousRank,
+      recap,
+      ...runData,
+    });
     this.emit('activeRuns:update', this.state.activeRuns);
     this.emit('scoreboard:update', this.state.leaderboard);
   }
@@ -330,5 +354,10 @@ class StateManager extends EventEmitter {
 
 // Singleton instance
 const stateManager = new StateManager();
+
+// Test-only helper — allows unit tests to seed leaderboard state
+StateManager.prototype._testSetLeaderboard = function (leaderboard) {
+  this.state.leaderboard = leaderboard;
+};
 
 module.exports = stateManager;

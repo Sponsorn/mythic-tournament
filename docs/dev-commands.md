@@ -63,6 +63,14 @@ curl -X POST -H "Content-Type: application/json" -d "{\"pinnedSlide\":\"infobox\
 curl -X POST -H "Content-Type: application/json" -d "{\"pinnedSlide\":null}" http://localhost:3000/api/director
 ```
 
+### Set infobox HTML (Layout A bottom-middle card)
+
+```bash
+curl -X POST -H "Content-Type: application/json" -d "{\"infoboxHtml\":\"<h3>Welcome to Lucky Wipe M+</h3><p>Round 1 starts at 16:00 ST</p>\"}" http://localhost:3000/api/director
+```
+
+Pass empty string to clear: `{"infoboxHtml":""}`. Renders raw HTML — admin trust boundary.
+
 ### Set tournament context (brand strip progress bar)
 
 ```bash

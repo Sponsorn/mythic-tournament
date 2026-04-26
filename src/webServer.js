@@ -206,6 +206,11 @@ function createWebServer(config = {}) {
         directorState._save();
         directorState.emit('change', directorState.getState());
       }
+      if (req.body.infoboxHtml !== undefined) {
+        directorState.state.infoboxHtml = String(req.body.infoboxHtml);
+        directorState._save();
+        directorState.emit('change', directorState.getState());
+      }
       res.json({ ok: true, state: directorState.getState() });
     } catch (err) {
       res.status(400).json({ ok: false, error: err.message });

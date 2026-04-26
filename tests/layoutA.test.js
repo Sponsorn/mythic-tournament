@@ -32,14 +32,15 @@ function loadCompositor() {
   return w;
 }
 
-test('layout A mounts dungeon hud, mini-lb, alt-card', () => {
+test('layout A mounts main, sidebar, hud, info, alt', () => {
   const w = loadCompositor();
   const root = w.document.createElement('div');
   w.document.body.appendChild(root);
   const inst = w.LayoutA.mount(root);
   assert.ok(root.querySelector('.la-main'));
+  assert.ok(root.querySelector('.la-sidebar'));
   assert.ok(root.querySelector('.la-hud'));
-  assert.ok(root.querySelector('.la-lb'));
+  assert.ok(root.querySelector('.la-info'));
   assert.ok(root.querySelector('.la-alt'));
   inst.unmount();
 });
@@ -95,8 +96,8 @@ test('layout A onRunComplete adds flash class to matching row', () => {
 
   inst.onRunComplete({ teamName: 'BRAVO', pointsEarned: 14, newTotal: 98, newRank: 2, previousRank: 3 });
 
-  const flashed = root.querySelector('.lb-row.flash');
-  assert.ok(flashed, 'expected a row with class flash');
+  const flashed = root.querySelector('.flb-row.flash');
+  assert.ok(flashed, 'expected a sidebar row with class flash');
   assert.match(flashed.textContent, /BRAVO/);
   assert.match(flashed.textContent, /\+14/);
   inst.unmount();

@@ -152,23 +152,70 @@ html, body {
 .compositor.layout-A .la-grid {
   position: absolute;
   inset: 0;
-  display: grid;
-  grid-template-rows: 1fr 150px;
-  grid-template-columns: 3fr 3fr 2fr;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   padding: 6px;
 }
+.compositor.layout-A .la-top {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  min-height: 0;
+}
 .compositor.layout-A .la-main {
-  grid-column: 1 / -1;
-  grid-row: 1;
+  flex: 1;
   background: #0a0a0f;
   border-radius: 4px;
   position: relative;
   overflow: hidden;
 }
-.compositor.layout-A .la-hud { grid-column: 1; grid-row: 2; }
-.compositor.layout-A .la-lb  { grid-column: 2; grid-row: 2; }
-.compositor.layout-A .la-alt { grid-column: 3; grid-row: 2; }
+.compositor.layout-A .la-sidebar {
+  flex: 0 0 360px;
+}
+.compositor.layout-A .la-bottom {
+  flex: 0 0 150px;
+  display: grid;
+  grid-template-columns: 3fr 3fr 2fr;
+  gap: 6px;
+}
+.compositor.layout-A .la-hud  { grid-column: 1; }
+.compositor.layout-A .la-info { grid-column: 2; }
+.compositor.layout-A .la-alt  { grid-column: 3; }
+
+/* Info card (replaces mini-leaderboard) */
+.info-card {
+  height: 100%;
+  background: rgba(15, 15, 22, 0.92);
+  border-left: 3px solid #4ade80;
+  border-radius: 4px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  color: #e8ecf4;
+  font-size: 14px;
+  overflow: hidden;
+}
+.info-card-header {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 11px;
+  color: #4ade80;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.info-card-body {
+  flex: 1;
+  overflow: hidden;
+}
+.info-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
 
 .la-main-overlay {
   position: absolute;

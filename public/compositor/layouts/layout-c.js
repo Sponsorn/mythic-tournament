@@ -21,11 +21,11 @@
       tileEls.forEach((tileEl, i) => {
         const teamName = grid[i];
 
-        // Clean up our own overlay + placeholder; leave embed container alone
-        const oldOverlay = tileEl.querySelector('.lc-tile-overlay');
-        if (oldOverlay) oldOverlay.remove();
-        const oldPlaceholder = tileEl.querySelector('.stream-tile-offline');
-        if (oldPlaceholder) oldPlaceholder.remove();
+        // Clean up our own labels + placeholder; leave embed container alone.
+        // Use direct children only so we don't disturb the embed iframe's
+        // inner DOM. Avoid a full-area overlay wrapper — Twitch's autoplay
+        // check rejects iframes obscured by another element.
+        tileEl.querySelectorAll(':scope > .tile-label, :scope > .tile-keylevel, :scope > .stream-tile-offline').forEach(n => n.remove());
 
         if (!teamName) {
           tileEl.classList.add('lc-tile--empty');
@@ -41,15 +41,17 @@
         if (window.TwitchEmbedManager) {
           window.TwitchEmbedManager.mountInto(teamName, tileEl, { focused: false });
         }
-        const overlay = document.createElement('div');
-        overlay.className = 'lc-tile-overlay';
         const run = (state.activeRuns || []).find(r => r.teamName === teamName);
-        const level = run?.keystoneLevel ? `+${run.keystoneLevel}` : '';
-        overlay.innerHTML = `
-          <div class="tile-label">${escapeHtml(teamName)}</div>
-          ${level ? `<div class="tile-keylevel">${level}</div>` : ''}
-        `;
-        tileEl.appendChild(overlay);
+        const label = document.createElement('div');
+        label.className = 'tile-label';
+        label.textContent = teamName;
+        tileEl.appendChild(label);
+        if (run?.keystoneLevel) {
+          const lvl = document.createElement('div');
+          lvl.className = 'tile-keylevel';
+          lvl.textContent = `+${run.keystoneLevel}`;
+          tileEl.appendChild(lvl);
+        }
       });
 
       window.FullLeaderboard.render(sidebarEl, {

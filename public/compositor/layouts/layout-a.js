@@ -41,18 +41,22 @@
     }
 
     function ensureOverlay(el, teamName, run) {
-      let overlay = el.querySelector('.la-main-overlay');
-      if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.className = 'la-main-overlay';
-        el.appendChild(overlay);
+      // Append tile-label/tile-keylevel directly to el (siblings of the
+      // embed). A full-area overlay wrapper, even with pointer-events:none,
+      // triggers Twitch's "obscured by other element" autoplay check.
+      el.querySelectorAll(':scope > .tile-label, :scope > .tile-keylevel').forEach(n => n.remove());
+      const escapeHtml = window.Compositor.escapeHtml;
+      const dungeon = run && run.dungeonName ? ` — ${escapeHtml(run.dungeonName)}` : '';
+      const label = document.createElement('div');
+      label.className = 'tile-label';
+      label.innerHTML = `${escapeHtml(teamName)}${dungeon}`;
+      el.appendChild(label);
+      if (run && run.keystoneLevel) {
+        const lvl = document.createElement('div');
+        lvl.className = 'tile-keylevel';
+        lvl.textContent = `+${run.keystoneLevel}`;
+        el.appendChild(lvl);
       }
-      const level = run && run.keystoneLevel ? `+${run.keystoneLevel}` : '';
-      const dungeon = run && run.dungeonName ? ` — ${window.Compositor.escapeHtml(run.dungeonName)}` : '';
-      overlay.innerHTML = `
-        <div class="tile-label">${window.Compositor.escapeHtml(teamName)}${dungeon}</div>
-        ${level ? `<div class="tile-keylevel">${level}</div>` : ''}
-      `;
     }
 
     function onRunComplete(payload) {

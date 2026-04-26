@@ -4,15 +4,20 @@
   const QUALITY_FOCUS = '720p30';
   const QUALITY_OFFSCREEN = '480p30';
 
-  const embeds = {}; // teamName → { player, container, channel, lastQuality, currentParent, onPlaying, desiredQuality, desiredMuted }
-  // Twitch's embed runs its own autoplay gate (style visibility +
-  // viewport visibility). Tricks like opacity:0 or clip-path fail it.
-  // The host stays fully visible at the top-left of the viewport, but
-  // sits behind .compositor (z-index:-1) — .compositor's opaque
-  // background visually covers the parked embeds.
-  const hiddenHost = document.createElement('div');
-  hiddenHost.style.cssText = 'position:absolute;left:0;top:0;width:640px;height:360px;pointer-events:none;z-index:-1;';
-  document.body.appendChild(hiddenHost);
+  // Twitch's embed runs an autoplay-visibility gate at construction time
+  // (style + viewport + obscured-by-other-element checks). Pre-instantiating
+  // in a hidden host fails this no matter what trick we use. So we build
+  // embeds lazily INSIDE the target slot, where they're truly visible at
+  // the moment Twitch.Player is constructed. Once playing, embeds can be
+  // moved to the parking host without re-triggering the autoplay check.
+  const embeds = {}; // teamName → { player, container, channel, lastQuality, currentParent, desiredQuality, desiredMuted, onPlaying, onReady }
+  const channels = {}; // teamName → twitchChannel (tracked from syncTeams; doesn't trigger embed build)
+
+  // Parking host for already-playing embeds. Twitch's autoplay gate has
+  // already passed for these, so visibility no longer matters here.
+  const parkHost = document.createElement('div');
+  parkHost.style.cssText = 'position:absolute;left:-99999px;top:-99999px;width:640px;height:360px;pointer-events:none;';
+  document.body.appendChild(parkHost);
 
   function applyDesiredState(embed) {
     try {
@@ -30,21 +35,17 @@
     try {
       embed.player.setMuted(embed.desiredMuted);
     } catch {}
-    // play() is idempotent on a playing stream — calling it from READY,
-    // mountInto, and setMainAudio gives us multiple chances to start
-    // playback if the first attempt was blocked.
     try { embed.player.play(); } catch {}
   }
 
-  function buildEmbed(team) {
-    if (!team.twitchChannel) return null;
+  function buildEmbedInto(teamName, channel, slotEl) {
     const container = document.createElement('div');
     container.className = 'twitch-embed-host';
     container.style.cssText = 'width:100%;height:100%;';
-    hiddenHost.appendChild(container);
+    slotEl.appendChild(container);
 
     const player = new Twitch.Player(container, {
-      channel: team.twitchChannel,
+      channel,
       width: '100%',
       height: '100%',
       muted: true,
@@ -55,8 +56,8 @@
     const record = {
       player,
       container,
-      channel: team.twitchChannel,
-      currentParent: hiddenHost,
+      channel,
+      currentParent: slotEl,
       lastQuality: null,
       desiredQuality: QUALITY_OFFSCREEN,
       desiredMuted: true,
@@ -68,11 +69,9 @@
       try {
         applyDesiredState(record);
       } catch (err) {
-        console.warn('[Twitch] applyDesiredState failed for', team.twitchChannel, err);
+        console.warn('[Twitch] applyDesiredState failed for', channel, err);
       }
     };
-    // OBS Browser Source / CEF blocks gesture-free autoplay even when muted.
-    // Force playback as soon as the player is ready.
     const onReady = function () {
       try { player.play(); } catch {}
     };
@@ -102,36 +101,43 @@
       if (embeds[team.name] && embeds[team.name].channel !== team.twitchChannel) {
         teardownEmbed(team.name);
       }
-      if (!embeds[team.name]) {
-        const embed = buildEmbed(team);
-        if (embed) embeds[team.name] = embed;
-      }
+      channels[team.name] = team.twitchChannel;
     });
     Object.keys(embeds).forEach(name => {
-      if (!seen.has(name)) {
-        teardownEmbed(name);
-      }
+      if (!seen.has(name)) teardownEmbed(name);
+    });
+    Object.keys(channels).forEach(name => {
+      if (!seen.has(name)) delete channels[name];
     });
   }
 
   function mountInto(teamName, slotEl, options) {
     if (!teamName || !slotEl) return;
-    const embed = embeds[teamName];
-    if (!embed) {
+
+    if (!channels[teamName]) {
       slotEl.innerHTML = `<div class="stream-tile-offline">${escapeHtml(teamName)} — no stream</div>`;
       return;
     }
+
     // Evict any OTHER embed currently parked in this slot
     Object.values(embeds).forEach(e => {
-      if (e !== embed && e.currentParent === slotEl) {
-        hiddenHost.appendChild(e.container);
-        e.currentParent = hiddenHost;
+      if (e !== embeds[teamName] && e.currentParent === slotEl) {
+        parkHost.appendChild(e.container);
+        e.currentParent = parkHost;
       }
     });
-    if (embed.currentParent !== slotEl) {
+
+    let embed = embeds[teamName];
+    if (!embed) {
+      // First time mounting this team — construct the player directly in
+      // the visible slot so Twitch's autoplay gate passes.
+      embed = buildEmbedInto(teamName, channels[teamName], slotEl);
+      embeds[teamName] = embed;
+    } else if (embed.currentParent !== slotEl) {
       slotEl.appendChild(embed.container);
       embed.currentParent = slotEl;
     }
+
     embed.desiredQuality = options && options.focused ? QUALITY_FOCUS : QUALITY_OFFSCREEN;
     applyDesiredState(embed);
   }
@@ -145,9 +151,9 @@
 
   function detachAll() {
     Object.values(embeds).forEach(e => {
-      if (e.currentParent !== hiddenHost) {
-        hiddenHost.appendChild(e.container);
-        e.currentParent = hiddenHost;
+      if (e.currentParent !== parkHost) {
+        parkHost.appendChild(e.container);
+        e.currentParent = parkHost;
       }
     });
   }
@@ -156,8 +162,8 @@
     if (!slotEl) return;
     Object.values(embeds).forEach(e => {
       if (e.currentParent === slotEl) {
-        hiddenHost.appendChild(e.container);
-        e.currentParent = hiddenHost;
+        parkHost.appendChild(e.container);
+        e.currentParent = parkHost;
       }
     });
   }

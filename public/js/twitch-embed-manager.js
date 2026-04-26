@@ -52,6 +52,7 @@
       desiredQuality: QUALITY_OFFSCREEN,
       desiredMuted: true,
       onPlaying: null,
+      onReady: null,
     };
 
     const onPlaying = function () {
@@ -61,8 +62,15 @@
         console.warn('[Twitch] applyDesiredState failed for', team.twitchChannel, err);
       }
     };
+    // OBS Browser Source / CEF blocks gesture-free autoplay even when muted.
+    // Force playback as soon as the player is ready.
+    const onReady = function () {
+      try { player.play(); } catch {}
+    };
     record.onPlaying = onPlaying;
+    record.onReady = onReady;
     player.addEventListener(Twitch.Player.PLAYING, onPlaying);
+    player.addEventListener(Twitch.Player.READY, onReady);
 
     return record;
   }
@@ -71,6 +79,7 @@
     const embed = embeds[name];
     if (!embed) return;
     try { embed.player.removeEventListener(Twitch.Player.PLAYING, embed.onPlaying); } catch {}
+    try { embed.player.removeEventListener(Twitch.Player.READY, embed.onReady); } catch {}
     try { embed.player.pause(); } catch {}
     try { embed.container.remove(); } catch {}
     delete embeds[name];

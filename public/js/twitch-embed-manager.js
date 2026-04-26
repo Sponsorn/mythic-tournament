@@ -28,6 +28,10 @@
     try {
       embed.player.setMuted(embed.desiredMuted);
     } catch {}
+    // play() is idempotent on a playing stream — calling it from READY,
+    // mountInto, and setMainAudio gives us multiple chances to start
+    // playback if the first attempt was blocked.
+    try { embed.player.play(); } catch {}
   }
 
   function buildEmbed(team) {

@@ -5,13 +5,13 @@
   const QUALITY_OFFSCREEN = '480p30';
 
   const embeds = {}; // teamName → { player, container, channel, lastQuality, currentParent, onPlaying, desiredQuality, desiredMuted }
-  // Twitch's embed enforces autoplay-visibility itself: it reads
-  // computed opacity, visibility, and display via getComputedStyle and
-  // refuses to play if anything looks hidden. We use clip-path:inset(50%)
-  // to make parked embeds visually invisible while leaving those
-  // computed styles untouched.
+  // Twitch's embed runs its own autoplay gate (style visibility +
+  // viewport visibility). Tricks like opacity:0 or clip-path fail it.
+  // The host stays fully visible at the top-left of the viewport, but
+  // sits behind .compositor (z-index:-1) — .compositor's opaque
+  // background visually covers the parked embeds.
   const hiddenHost = document.createElement('div');
-  hiddenHost.style.cssText = 'position:absolute;left:0;top:0;width:640px;height:360px;pointer-events:none;clip-path:inset(50%);';
+  hiddenHost.style.cssText = 'position:absolute;left:0;top:0;width:640px;height:360px;pointer-events:none;z-index:-1;';
   document.body.appendChild(hiddenHost);
 
   function applyDesiredState(embed) {

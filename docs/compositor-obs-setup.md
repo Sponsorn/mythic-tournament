@@ -37,6 +37,7 @@ Valid layouts: `PRE`, `A`, `C`, `D`, `G`, `LB`, `BT`. Phase 1 implements `A`, `C
 
 ## Troubleshooting
 
+- **Streams don't autoplay**: the embed manager already calls `play()` on the `READY` event and parks idle embeds on-screen-but-invisible (CEF blocks autoplay for off-screen iframes). If streams still won't start in OBS, relaunch OBS with the flag `--autoplay-policy=no-user-gesture-required` (Windows: edit your OBS shortcut → "Target", append the flag at the end).
 - **Streams show ads**: verify you logged in via OBS Interact and that cookies persisted. Fallback: use Chrome window capture pointing at the same URL.
 - **Streams don't load**: check browser source console via Interact. Twitch requires `parent` to match the hostname serving the page — if you're serving from anything but `localhost`, the compositor code uses `window.location.hostname` automatically.
 - **Layout doesn't change**: check `http://localhost:3000/api/director` returns the expected state. Compositor listens via Socket.io — if the socket disconnected, refresh the browser source.

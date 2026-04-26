@@ -5,8 +5,11 @@
   const QUALITY_OFFSCREEN = '480p30';
 
   const embeds = {}; // teamName → { player, container, channel, lastQuality, currentParent, onPlaying, desiredQuality, desiredMuted }
+  // Hidden host stays on-screen with opacity:0 + z-index:-1 so CEF/OBS
+  // treats parked embeds as "visible" — off-screen positioning makes
+  // intersection-observer-aware autoplay-policies block playback.
   const hiddenHost = document.createElement('div');
-  hiddenHost.style.cssText = 'position:absolute;left:-99999px;top:-99999px;width:640px;height:360px;pointer-events:none;';
+  hiddenHost.style.cssText = 'position:absolute;left:0;top:0;width:640px;height:360px;pointer-events:none;opacity:0;z-index:-1;';
   document.body.appendChild(hiddenHost);
 
   function applyDesiredState(embed) {

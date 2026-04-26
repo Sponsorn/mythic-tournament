@@ -47,7 +47,7 @@ curl -X POST -H "Content-Type: application/json" -d "{\"slot\":\"main\",\"team\"
 curl -X POST -H "Content-Type: application/json" -d "{\"slot\":\"main\",\"team\":null}" http://localhost:3000/api/director
 ```
 
-Valid slots: `main`, `grid.0..5`, `quad.0..3`, `strip.0..3`. Team value is a team name (from `data/wcl.json`) or `null`.
+Valid slots: `main`, `grid[0]..[5]`, `quad[0]..[3]`, `strip[0]..[3]`. Team value is a team name (from `data/wcl.json`) or `null`.
 
 ### Toggle focused-stream audio (layouts A and D only)
 
